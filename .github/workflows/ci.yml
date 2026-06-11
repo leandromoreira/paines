@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out your repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Install uv and set up Python with caching enabled
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # Automatically cache dependencies for faster subsequent runs
+          enable-cache: true
+          # Specify the Python version (or omit to use your .python-version file)
+          python-version: "3.12"
+
+      # 3. Install dependencies from uv.lock
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # 4. Run your tests or scripts using uv run
+      - name: Run Pytest
+        run: uv run pytest
+
