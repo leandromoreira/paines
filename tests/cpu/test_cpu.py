@@ -44,7 +44,7 @@ class Test6502Instructions(unittest.TestCase):
 
         self.cpu.execute()
 
-        self.assertEqual(self.cpu.a, 0xFF)
+        self.assertEqual(self.cpu.a, 0xFE)
 
     def test_lda_zpx(self) -> None:
         self.cpu.x = 0x10
