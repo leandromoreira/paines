@@ -1,0 +1,166 @@
+from typing import Callable
+
+from paines.bus.bus import CPUBus, cpu_bus_builder
+from paines.types import U16, U8
+
+
+class Instruction:
+    def __init__(self, name: str, fn: Callable[[U8], bool], mode: Callable[[], tuple[U16, bool]], cycles: int) -> None:
+        self.name = name
+        self.fn = fn
+        self.mode = mode
+        self.cycles = cycles
+
+
+class CPU6502:
+    def __init__(self, bus :CPUBus = cpu_bus_builder(), debug :bool = False) -> None:
+        self.pc :U16 = 0xFFFC
+        self.a :U8 = 0x00
+        self.x :U8 = 0x00
+        self.y :U8 = 0x00
+        self.s :U8 = 0x00
+        self.p_carry :U8 = 0x0
+        self.p_zero :U8 = 0x0
+        self.p_irq :U8 = 0x0
+        self.p_dcm :U8 = 0x0
+        self.p_brk :U8 = 0x0
+        self.p_unused :U8 = 0x1
+        self.p_overflow :U8 = 0x0
+        self.p_sign :U8 = 0x0
+        self.p :U8 = 0x0
+
+        self.bus = bus
+        self.total_cycle :int = 0
+        self.debug = debug
+        self.traces :list[str] = []
+
+        self.instruction_set : dict[U8,Instruction] = {}
+        self.init_table()
+
+    def compose_p(self) -> None:
+        self.p = self.p_carry | (self.p_zero << 1) | (self.p_irq << 2) | (self.p_dcm << 3) | (self.p_brk << 4) | (1 << 5) | (self.p_overflow << 6) | (self.p_sign << 7)
+
+    def check_nz(self, value: U8) -> None:
+        self.p_sign = (value >> 7) & 1
+        self.p_zero = 1 if value == 0 else 0
+
+    def _mode_imm(self) -> tuple[U16, bool]:
+        addr = self.pc
+        self.pc += 1
+        return addr, False
+
+    def _mode_zp(self) -> tuple[U16, bool]:
+        addr = self.bus.read(self.pc)
+        self.pc += 1
+        return addr & 0xFF, False
+
+    def _mode_zp_x(self) -> tuple[U16, bool]:
+        addr, _ = self._mode_zp()
+        return (addr + self.x) & 0xFF, False
+
+    def _mode_zp_y(self) -> tuple[U16, bool]:
+        addr, _ = self._mode_zp()
+        return (addr + self.y) & 0xFF, False
+
+    def _mode_abs(self) -> tuple[U16, bool]:
+        low = self.bus.read(self.pc)
+        self.pc += 1
+        high = self.bus.read(self.pc)
+        self.pc += 1
+        return (high << 8) | low, False
+
+    def _mode_abs_x(self) -> tuple[U16, bool]:
+        base, _ = self._mode_abs()
+        final :U16 = (base + self.x) & 0xFFFF
+        page_crossed = (final & 0xFF00) != (base & 0xFF00)
+        return final, page_crossed
+
+    def _mode_abs_y(self) -> tuple[U16, bool]:
+        base, _ = self._mode_abs()
+        final :U16 = (base + self.y) & 0xFFFF
+        page_crossed = (final & 0xFF00) != (base & 0xFF00)
+        return final, page_crossed
+
+    def _mode_ind_x(self) -> tuple[U16, bool]:
+        base = self.bus.read(self.pc)
+        self.pc += 1
+        ptr : U16 = (base + self.x) & 0xFF
+        low = self.bus.read(ptr)
+        high = self.bus.read((ptr + 1) & 0xFF)
+        return (high << 8) | low, False
+
+    def _mode_ind_y(self) -> tuple[U16, bool]:
+        ptr = self.bus.read(self.pc)
+        self.pc += 1
+        low = self.bus.read(ptr)
+        high = self.bus.read((ptr+1) & 0xFF)
+        base :U16 = (high << 8) | low
+        final :U16 = (base + self.y) & 0xFFFF
+        page_crossed = (final & 0xFF00) != (base & 0xFF00)
+        return final, page_crossed
+
+    def execute(self) -> U8:
+        cycles  :U8 = 0
+        initial_address :U16 = self.pc
+        op_code :U8 = self.bus.read(self.pc)
+        self.pc += 1
+
+        instruction = self.instruction_set.get(op_code)
+        if instruction is None:
+            raise NotImplementedError(f"Opcode {hex(op_code)} not implemented!")
+
+        operand_address = self.pc
+        addr, page_crossed = instruction.mode()
+
+        if self.debug:
+            self.print_trace(initial_address, operand_address, instruction)
+
+        allows_page_penalty = instruction.fn(addr)
+        cycles += instruction.cycles
+        if allows_page_penalty and page_crossed:
+            cycles += 1
+
+        self.total_cycle += cycles
+        return cycles
+
+    # helper to print expected nes test format
+    # C000  4C F5 C5  JMP $C5F5                       A:00 X:00 Y:00 P:24 SP:FD PPU:  0, 21 CYC:7
+    # https://github.com/christopherpow/nes-test-roms/blob/master/other/nestest.log
+    def print_trace(self, initial_address :U16, operand :U16, instruction :Instruction) -> None:
+        operand_length :U8 = self.pc - operand
+        asm_trace = instruction.name
+        if operand_length == 1:
+            raw_operand = self.bus.read(operand)
+            asm_trace = instruction.name.format(raw_operand)
+        elif operand_length == 2:
+            low = self.bus.read(operand)
+            high = self.bus.read(operand + 1)
+            raw_operand = (high << 8) | low
+            asm_trace = instruction.name.format(raw_operand)
+
+        opcode_plus_operand_bytes :str = "{:02X}".format(self.bus.read(operand-1))
+        for i in range(operand_length):
+            opcode_plus_operand_bytes += " {:02X}".format(self.bus.read(operand+i))
+        bytes_str = f"{opcode_plus_operand_bytes:<9}"
+        asm_trace = f"{asm_trace:<32}"
+        self.compose_p()
+        log_line = f"{initial_address:04X}  {bytes_str} {asm_trace}A:{self.a:02X} X:{self.x:02X} Y:{self.y:02X} P:{self.p:02X} SP:{self.s:02X}"
+
+        self.traces.append(log_line)
+
+    def init_table(self) -> None:
+        self.instruction_set[0xA9] = Instruction("LDA #{:02X}", self.lda, self._mode_imm, 2)
+        self.instruction_set[0xA5] = Instruction("LDA {:02X}", self.lda, self._mode_zp, 3)
+        self.instruction_set[0xB5] = Instruction("LDA {:02X}, X", self.lda, self._mode_zp_x, 4)
+        self.instruction_set[0xAD] = Instruction("LDA {:04X}", self.lda, self._mode_abs, 4)
+        self.instruction_set[0xBD] = Instruction("LDA {:04X}, X", self.lda, self._mode_abs_x, 4)
+        self.instruction_set[0xB9] = Instruction("LDA {:04X}, Y", self.lda, self._mode_abs_y, 4)
+        self.instruction_set[0xA1] = Instruction("LDA ({:02X}, X)", self.lda, self._mode_ind_x, 6)
+        self.instruction_set[0xB1] = Instruction("LDA ({:02X}), Y", self.lda, self._mode_ind_y, 5)
+
+
+    def lda(self, address :U16) -> bool:
+        operand :U8 = self.bus.read(address)
+        self.a = operand
+        self.check_nz(self.a)
+        return True
