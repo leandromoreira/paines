@@ -25,17 +25,23 @@ from paines.types import U16, U8
 class CPUBus:
     def __init__(self, ram: RAM = ram_builder()) -> None:
         self.ram = ram # 0x0000 - 0x1FFF WRAM
+        self.open_bus :U8 = 0
 
     def read(self, address: U16) -> U8:
         if address <= 0x1FFF:
-           return self.ram.read(address)
-        raise AssertionError("cpu bus read should never reach this")
+           self.open_bus = self.ram.read(address)
+           return self.open_bus
+
+        return self.open_bus
 
     def write(self, address: U16, value: U8) -> None:
+        self.open_bus = value
+
         if address <= 0x1FFF:
             self.ram.write(address, value)
             return
-        raise AssertionError("cpu bus read should never reach this")
+
+        return
 
 def cpu_bus_builder() -> CPUBus:
     return CPUBus()
