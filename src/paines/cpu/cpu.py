@@ -44,6 +44,9 @@ class CPU6502:
         self.p_sign = (value >> 7) & 1
         self.p_zero = 1 if value == 0 else 0
 
+    def _mode_implied(self) -> tuple[U16, bool]:
+        return 0, False
+
     def _mode_imm(self) -> tuple[U16, bool]:
         addr = self.pc
         self.pc += 1
@@ -149,7 +152,16 @@ class CPU6502:
         self.traces.append(log_line)
 
     def init_table(self) -> None:
+        self.instruction_set[0xA8] = Instruction("TAY", self.tay, self._mode_implied, 2)
+        self.instruction_set[0xAA] = Instruction("TAX", self.tax, self._mode_implied, 2)
+        self.instruction_set[0xBA] = Instruction("TSX", self.tsx, self._mode_implied, 2)
+        self.instruction_set[0x98] = Instruction("TYA", self.tya, self._mode_implied, 2)
+        self.instruction_set[0x8A] = Instruction("TXA", self.txa, self._mode_implied, 2)
+        self.instruction_set[0x9A] = Instruction("TXS", self.txs, self._mode_implied, 2)
         self.instruction_set[0xA9] = Instruction("LDA #{:02X}", self.lda, self._mode_imm, 2)
+        self.instruction_set[0xA2] = Instruction("LDX #{:02X}", self.ldx, self._mode_imm, 2)
+        self.instruction_set[0xA0] = Instruction("LDY #{:02X}", self.ldy, self._mode_imm, 2)
+
         self.instruction_set[0xA5] = Instruction("LDA {:02X}", self.lda, self._mode_zp, 3)
         self.instruction_set[0xB5] = Instruction("LDA {:02X}, X", self.lda, self._mode_zp_x, 4)
         self.instruction_set[0xAD] = Instruction("LDA {:04X}", self.lda, self._mode_abs, 4)
@@ -164,3 +176,45 @@ class CPU6502:
         self.a = operand
         self.check_nz(self.a)
         return True
+
+    def ldx(self, address :U16) -> bool:
+        operand :U8 = self.bus.read(address)
+        self.x = operand
+        self.check_nz(self.x)
+        return True
+
+    def ldy(self, address :U16) -> bool:
+        operand :U8 = self.bus.read(address)
+        self.y = operand
+        self.check_nz(self.y)
+        return True
+
+
+    def tay(self, _: U16) -> bool:
+        self.y = self.a
+        self.check_nz(self.y)
+        return False
+
+    def tya(self, _: U16) -> bool:
+        self.a = self.y
+        self.check_nz(self.a)
+        return False
+
+    def tax(self, _: U16) -> bool:
+        self.x = self.a
+        self.check_nz(self.x)
+        return False
+
+    def txa(self, _: U16) -> bool:
+        self.a = self.x
+        self.check_nz(self.a)
+        return False
+
+    def txs(self, _: U16) -> bool:
+        self.s = self.x
+        return False
+
+    def tsx(self, _: U16) -> bool:
+        self.x = self.s
+        self.check_nz(self.x)
+        return False

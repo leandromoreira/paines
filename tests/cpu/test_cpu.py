@@ -125,3 +125,71 @@ class Test6502Instructions(unittest.TestCase):
 
         self.assertEqual(self.cpu.a, 0xCD)
         self.assertEqual(5, cycles)
+
+    def test_ldx_immediate(self) -> None:
+        self.write_bytes(START_PC, [0xA2, 0x51])
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.x, 0x51)
+
+    def test_ldy_immediate(self) -> None:
+        self.write_bytes(START_PC, [0xA0, 0x69])
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.y, 0x69)
+
+    def test_tay(self) -> None:
+        self.write_bytes(START_PC, [0xA8])
+        self.cpu.a = 0x69
+        self.assertEqual(self.cpu.y, 0x00)
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.y, 0x69)
+
+    def test_tax(self) -> None:
+        self.write_bytes(START_PC, [0xAA])
+        self.cpu.a = 0x69
+        self.assertEqual(self.cpu.x, 0x00)
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.x, 0x69)
+
+    def test_tsx(self) -> None:
+        self.write_bytes(START_PC, [0xBA])
+        self.cpu.s = 0x69
+        self.assertEqual(self.cpu.x, 0x00)
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.x, 0x69)
+
+    def test_tya(self) -> None:
+        self.write_bytes(START_PC, [0x98])
+        self.cpu.y = 0x69
+        self.assertEqual(self.cpu.a, 0x00)
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.a, 0x69)
+
+    def test_txa(self) -> None:
+        self.write_bytes(START_PC, [0x8A])
+        self.cpu.x = 0x69
+        self.assertEqual(self.cpu.a, 0x00)
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.a, 0x69)
+
+    def test_txs(self) -> None:
+        self.write_bytes(START_PC, [0x9A])
+        self.cpu.x = 0x69
+        self.assertEqual(self.cpu.s, 0x00)
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.s, 0x69)
