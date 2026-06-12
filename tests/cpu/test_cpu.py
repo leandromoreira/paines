@@ -116,15 +116,15 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(5, cycles)
 
     def test_lda_ind_y_cross(self) -> None:
-        self.cpu.y = 0x20
+        self.cpu.y = 0xFC
         self.write_bytes(START_PC, [0xB1, 0xEA])
         self.write_bytes(0xEA, [0xB1, 0x02])
-        self.write_bytes(0x02D1, [0xCD])
+        self.write_bytes(0x03AD, [0xCD])
 
         cycles = self.cpu.execute()
 
         self.assertEqual(self.cpu.a, 0xCD)
-        self.assertEqual(5, cycles)
+        self.assertEqual(6, cycles)
 
     def test_ldx_immediate(self) -> None:
         self.write_bytes(START_PC, [0xA2, 0x51])
