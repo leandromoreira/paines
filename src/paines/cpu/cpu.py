@@ -5,9 +5,9 @@ from paines.types import U16, U8
 
 
 class Instruction:
-    def __init__(self, name: str, fn: Callable[[U8], bool], mode: Callable[[], tuple[U16, bool]], cycles: int) -> None:
+    def __init__(self, name: str, execute: Callable[[U8], bool], mode: Callable[[], tuple[U16, bool]], cycles: int) -> None:
         self.name = name
-        self.fn = fn
+        self.execute = execute
         self.mode = mode
         self.cycles = cycles
 
@@ -118,7 +118,7 @@ class CPU6502:
         if self.debug:
             self.print_trace(initial_address, operand_address, instruction)
 
-        allows_page_penalty = instruction.fn(addr)
+        allows_page_penalty = instruction.execute(addr)
         cycles += instruction.cycles
         if allows_page_penalty and page_crossed:
             cycles += 1
