@@ -9,7 +9,7 @@ SRAM_END :U16 = 0x7FFF
 ONE_PRG_BANK :U16 = 0x4000
 class Cartridge:
     # https://www.nesdev.org/wiki/INES#iNES_file_format
-    def __init__(self):
+    def __init__(self) -> None:
         self.prg :list[U8] = []
         self.chr :list[U8] = []
         self.magic_id :bytes = b""
