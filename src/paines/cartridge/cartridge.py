@@ -16,7 +16,7 @@ class Cartridge:
         self.prg_size :U8 = 0
         self.chr_size :U8 = 0
         self.flags_6 :U8 = 0
-        self.has_battery_sram :bool = bool(self.flags_6 & 0x02)
+        self.has_battery_sram :bool = False
         self.flags_7 :U8 = 0
         self.prg_ram_size :U8 = 0
         self.flags_9 :U8 = 0
@@ -36,6 +36,8 @@ class Cartridge:
             self.flags_9 = header[9]
             self.flags_10 = header[10]
             self.unused = header[11:16]
+
+            self.has_battery_sram :bool = bool(self.flags_6 & 0x02)
 
             self.prg = list(rom.read(ONE_PRG_BANK * self.prg_size))
             self.sram = [0] * (SRAM_END - SRAM_START + 1)
