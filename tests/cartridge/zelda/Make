@@ -1,0 +1,2 @@
+DAsm Zelda.asm -f3
+Join Header a.out Zelda.CHR AS Zelda.NES

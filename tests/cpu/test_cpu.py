@@ -1,10 +1,14 @@
 import unittest
+from pathlib import Path
+
 from paines.ram.memory import RAM
 from paines.bus.bus import CPUBus
 from paines.cpu.cpu import CPU6502
+from paines.cartridge.cartridge import Cartridge
 from paines.types import U16, U8
 
 START_PC :U16 = 0x0FFF
+CARTRIDGE_PATH = f"{Path(__file__).parent.parent}/cartridge/"
 
 class Test6502Instructions(unittest.TestCase):
     def setUp(self) -> None:
@@ -16,6 +20,17 @@ class Test6502Instructions(unittest.TestCase):
     def write_bytes(self, start_addr: U16, bytes_list: list[U8]) -> None:
         for i, b in enumerate(bytes_list):
             self.bus.write(start_addr + i, b)
+
+    def test_reset(self) -> None:
+        zelda = Cartridge()
+        zelda.load(f"{CARTRIDGE_PATH}/zelda/Zelda.nes")
+
+        self.cpu.bus.cartridge = zelda
+        cycles = self.cpu.reset()
+
+        self.assertEqual(0xC037, self.cpu.pc)
+        self.assertEqual(cycles, 7)
+        self.assertEqual(self.cpu.s, 0xFD)
 
     def test_lda_immediate(self) -> None:
         self.write_bytes(START_PC, [0xA9, 0x42])
@@ -188,7 +203,7 @@ class Test6502Instructions(unittest.TestCase):
     def test_txs(self) -> None:
         self.write_bytes(START_PC, [0x9A])
         self.cpu.x = 0x69
-        self.assertEqual(self.cpu.s, 0x00)
+        self.assertEqual(self.cpu.s, 0xFD)
 
         self.cpu.execute()
 

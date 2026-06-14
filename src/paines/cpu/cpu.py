@@ -18,10 +18,10 @@ class CPU6502:
         self.a :U8 = 0x00
         self.x :U8 = 0x00
         self.y :U8 = 0x00
-        self.s :U8 = 0x00
+        self.s :U8 = 0xFD
         self.p_carry :U8 = 0x0
         self.p_zero :U8 = 0x0
-        self.p_irq :U8 = 0x0
+        self.p_irq :U8 = 0x1
         self.p_dcm :U8 = 0x0
         self.p_brk :U8 = 0x0
         self.p_unused :U8 = 0x1
@@ -37,8 +37,19 @@ class CPU6502:
         self.instruction_set : dict[U8,Instruction] = {}
         self.init_table()
 
+    def reset(self) -> U8:
+        self.pc :U16 = 0xFFFC
+        low = self.bus.read(self.pc)
+        self.pc += 1
+        high = self.bus.read(self.pc)
+        self.pc = (high << 8) | low
+        self.s = 0xFD
+        self.p_irq :U8 = 0x1
+        self.compose_p()
+        return 7
+
     def compose_p(self) -> None:
-        self.p = self.p_carry | (self.p_zero << 1) | (self.p_irq << 2) | (self.p_dcm << 3) | (self.p_brk << 4) | (1 << 5) | (self.p_overflow << 6) | (self.p_sign << 7)
+        self.p = self.p_carry | (self.p_zero << 1) | (self.p_irq << 2) | (self.p_dcm << 3) | (self.p_brk << 4) | (self.p_unused << 5) | (self.p_overflow << 6) | (self.p_sign << 7)
 
     def check_nz(self, value: U8) -> None:
         self.p_sign = (value >> 7) & 1
@@ -116,6 +127,8 @@ class CPU6502:
         addr, page_crossed = instruction.mode()
 
         if self.debug:
+            # must fix the BUS READ to not affect open bus and registers
+            # create a proper interface to handle debug opportunity
             self.print_trace(initial_address, operand_address, instruction)
 
         allows_page_penalty = instruction.execute(addr)
