@@ -6,6 +6,7 @@ from paines.types import U16, U8
 CPU_PRG_START :U16 = 0x8000
 SRAM_START :U16 = 0x6000
 SRAM_END :U16 = 0x7FFF
+SRAM_MASK :U16 = SRAM_END-SRAM_START
 ONE_PRG_BANK :U16 = 0x4000
 class Cartridge:
     # https://www.nesdev.org/wiki/INES#iNES_file_format
@@ -52,7 +53,7 @@ class Cartridge:
             return self.prg[(address - CPU_PRG_START) & self.prg_mask]
         if address >= 0x6000 and self.has_battery_sram:
             # TODO: to implement
-            return self.sram[(address - SRAM_START) & SRAM_END]
+            return self.sram[(address - SRAM_START) & SRAM_MASK]
         return open_bus
 
     def write(self, address: U16, value: U8) -> None:

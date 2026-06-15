@@ -191,7 +191,7 @@ class CPU6502:
         self.instruction_set[0xAA] = Instruction("TAX", self.tax, self._mode_implied, 2, 0xAA)
         self.instruction_set[0xBA] = Instruction("TSX", self.tsx, self._mode_implied, 2, 0xBA)
         self.instruction_set[0x98] = Instruction("TYA", self.tya, self._mode_implied, 2, 0x98)
-        self.instruction_set[0x8A] = Instruction("TXA", self.txa, self._mode_implied, 2, 0xAA)
+        self.instruction_set[0x8A] = Instruction("TXA", self.txa, self._mode_implied, 2, 0x8A)
         self.instruction_set[0x9A] = Instruction("TXS", self.txs, self._mode_implied, 2, 0x9A)
         self.instruction_set[0xA9] = Instruction("LDA #{:02X}", self.lda, self._mode_imm, 2, 0xA9)
         self.instruction_set[0xA2] = Instruction("LDX #{:02X}", self.ldx, self._mode_imm, 2, 0xA2)
@@ -202,7 +202,7 @@ class CPU6502:
         self.instruction_set[0xAD] = Instruction("LDA {:04X}", self.lda, self._mode_abs, 4, 0xAD)
         self.instruction_set[0xBD] = Instruction("LDA {:04X}, X", self.lda, self._mode_abs_x, 4, 0xBD)
         self.instruction_set[0xB9] = Instruction("LDA {:04X}, Y", self.lda, self._mode_abs_y, 4, 0xB9)
-        self.instruction_set[0xA1] = Instruction("LDA ({:02X}, X)", self.lda, self._mode_ind_x, 6, 0xAa)
+        self.instruction_set[0xA1] = Instruction("LDA ({:02X}, X)", self.lda, self._mode_ind_x, 6, 0xA1)
         self.instruction_set[0xB1] = Instruction("LDA ({:02X}), Y", self.lda, self._mode_ind_y, 5, 0xB1)
 
 
