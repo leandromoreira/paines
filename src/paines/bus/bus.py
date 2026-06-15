@@ -40,6 +40,16 @@ class CPUBus:
 
         return self.open_bus
 
+    def peek(self, address: U16) -> U8:
+        dummy_open_bus :U8 = 0x00
+        if address <= 0x1FFF:
+           return self.ram.read(address)
+
+        if address >= 0x4018 and address <= 0xFFFF:
+            return self.cartridge.read(address, dummy_open_bus)
+
+        return dummy_open_bus
+
     def write(self, address: U16, value: U8) -> None:
         self.open_bus = value
 

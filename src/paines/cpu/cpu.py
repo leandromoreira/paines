@@ -5,11 +5,23 @@ from paines.types import U16, U8
 
 
 class Instruction:
-    def __init__(self, name: str, execute: Callable[[U8], bool], mode: Callable[[], tuple[U16, bool]], cycles: int) -> None:
+    def __init__(
+            self, name: str,
+            execute: Callable[[U8], bool],
+            mode: Callable[[], tuple[U16, bool]],
+            cycles: U8,
+            op_code: U8,
+    ) -> None:
         self.name = name
         self.execute = execute
         self.mode = mode
         self.cycles = cycles
+        self.op_code = op_code
+
+class DebugTrace:
+    def __init__(self, address :U16, value :U8) -> None:
+        self.address = address
+        self.value = value
 
 
 class CPU6502:
@@ -127,9 +139,7 @@ class CPU6502:
         addr, page_crossed = instruction.mode()
 
         if self.debug:
-            # must fix the BUS READ to not affect open bus and registers
-            # create a proper interface to handle debug opportunity
-            self.print_trace(initial_address, operand_address, instruction)
+            self.perform_debug(instruction, op_code, initial_address, operand_address)
 
         allows_page_penalty = instruction.execute(addr)
         cycles += instruction.cycles
@@ -139,49 +149,61 @@ class CPU6502:
         self.total_cycle += cycles
         return cycles
 
+    def perform_debug(self, instruction :Instruction, op_code :U8, initial_address :U16, operand_address :U16) -> None:
+        operand_length :U8 = self.pc - operand_address
+        bytes_for_debug :list[DebugTrace]= [
+            DebugTrace(initial_address, op_code),
+        ]
+        for i in range(operand_length):
+            # TODO: should be careful by reading IO mm
+            bytes_for_debug.append(DebugTrace(initial_address+1+i, self.bus.peek(initial_address+1+i)))
+        self.handle_debug_trace(bytes_for_debug, instruction)
+
     # helper to print expected nes test format
     # C000  4C F5 C5  JMP $C5F5                       A:00 X:00 Y:00 P:24 SP:FD PPU:  0, 21 CYC:7
     # https://github.com/christopherpow/nes-test-roms/blob/master/other/nestest.log
-    def print_trace(self, initial_address :U16, operand :U16, instruction :Instruction) -> None:
-        operand_length :U8 = self.pc - operand
+    def handle_debug_trace(self, memory_slice :list[DebugTrace], instruction :Instruction) -> None:
         asm_trace = instruction.name
-        if operand_length == 1:
-            raw_operand = self.bus.read(operand)
+        if len(memory_slice) == 2:
+            raw_operand = memory_slice[1].value
             asm_trace = instruction.name.format(raw_operand)
-        elif operand_length == 2:
-            low = self.bus.read(operand)
-            high = self.bus.read(operand + 1)
+        elif len(memory_slice) == 3:
+            low = memory_slice[1].value
+            high = memory_slice[2].value
             raw_operand = (high << 8) | low
             asm_trace = instruction.name.format(raw_operand)
 
-        opcode_plus_operand_bytes :str = "{:02X}".format(self.bus.read(operand-1))
-        for i in range(operand_length):
-            opcode_plus_operand_bytes += " {:02X}".format(self.bus.read(operand+i))
+        opcode_plus_operand_bytes :str = "{:02X}".format(memory_slice[0].value)
+        for i in range(1, len(memory_slice)):
+            opcode_plus_operand_bytes += " {:02X}".format(memory_slice[i].value)
         bytes_str = f"{opcode_plus_operand_bytes:<9}"
         asm_trace = f"{asm_trace:<32}"
         self.compose_p()
-        log_line = f"{initial_address:04X}  {bytes_str} {asm_trace}A:{self.a:02X} X:{self.x:02X} Y:{self.y:02X} P:{self.p:02X} SP:{self.s:02X}"
+        log_line = f"{memory_slice[0].address:04X}  {bytes_str} {asm_trace}A:{self.a:02X} X:{self.x:02X} Y:{self.y:02X} P:{self.p:02X} SP:{self.s:02X}"
 
+        with open("output.txt", "a") as file:
+            file.write(f"{log_line}\n")
         self.traces.append(log_line)
 
-    def init_table(self) -> None:
-        self.instruction_set[0xA8] = Instruction("TAY", self.tay, self._mode_implied, 2)
-        self.instruction_set[0xAA] = Instruction("TAX", self.tax, self._mode_implied, 2)
-        self.instruction_set[0xBA] = Instruction("TSX", self.tsx, self._mode_implied, 2)
-        self.instruction_set[0x98] = Instruction("TYA", self.tya, self._mode_implied, 2)
-        self.instruction_set[0x8A] = Instruction("TXA", self.txa, self._mode_implied, 2)
-        self.instruction_set[0x9A] = Instruction("TXS", self.txs, self._mode_implied, 2)
-        self.instruction_set[0xA9] = Instruction("LDA #{:02X}", self.lda, self._mode_imm, 2)
-        self.instruction_set[0xA2] = Instruction("LDX #{:02X}", self.ldx, self._mode_imm, 2)
-        self.instruction_set[0xA0] = Instruction("LDY #{:02X}", self.ldy, self._mode_imm, 2)
 
-        self.instruction_set[0xA5] = Instruction("LDA {:02X}", self.lda, self._mode_zp, 3)
-        self.instruction_set[0xB5] = Instruction("LDA {:02X}, X", self.lda, self._mode_zp_x, 4)
-        self.instruction_set[0xAD] = Instruction("LDA {:04X}", self.lda, self._mode_abs, 4)
-        self.instruction_set[0xBD] = Instruction("LDA {:04X}, X", self.lda, self._mode_abs_x, 4)
-        self.instruction_set[0xB9] = Instruction("LDA {:04X}, Y", self.lda, self._mode_abs_y, 4)
-        self.instruction_set[0xA1] = Instruction("LDA ({:02X}, X)", self.lda, self._mode_ind_x, 6)
-        self.instruction_set[0xB1] = Instruction("LDA ({:02X}), Y", self.lda, self._mode_ind_y, 5)
+    def init_table(self) -> None:
+        self.instruction_set[0xA8] = Instruction("TAY", self.tay, self._mode_implied, 2, 0xA8)
+        self.instruction_set[0xAA] = Instruction("TAX", self.tax, self._mode_implied, 2, 0xAA)
+        self.instruction_set[0xBA] = Instruction("TSX", self.tsx, self._mode_implied, 2, 0xBA)
+        self.instruction_set[0x98] = Instruction("TYA", self.tya, self._mode_implied, 2, 0x98)
+        self.instruction_set[0x8A] = Instruction("TXA", self.txa, self._mode_implied, 2, 0xAA)
+        self.instruction_set[0x9A] = Instruction("TXS", self.txs, self._mode_implied, 2, 0x9A)
+        self.instruction_set[0xA9] = Instruction("LDA #{:02X}", self.lda, self._mode_imm, 2, 0xA9)
+        self.instruction_set[0xA2] = Instruction("LDX #{:02X}", self.ldx, self._mode_imm, 2, 0xA2)
+        self.instruction_set[0xA0] = Instruction("LDY #{:02X}", self.ldy, self._mode_imm, 2, 0xA0)
+
+        self.instruction_set[0xA5] = Instruction("LDA {:02X}", self.lda, self._mode_zp, 3, 0xA5)
+        self.instruction_set[0xB5] = Instruction("LDA {:02X}, X", self.lda, self._mode_zp_x, 4, 0xB5)
+        self.instruction_set[0xAD] = Instruction("LDA {:04X}", self.lda, self._mode_abs, 4, 0xAD)
+        self.instruction_set[0xBD] = Instruction("LDA {:04X}, X", self.lda, self._mode_abs_x, 4, 0xBD)
+        self.instruction_set[0xB9] = Instruction("LDA {:04X}, Y", self.lda, self._mode_abs_y, 4, 0xB9)
+        self.instruction_set[0xA1] = Instruction("LDA ({:02X}, X)", self.lda, self._mode_ind_x, 6, 0xAa)
+        self.instruction_set[0xB1] = Instruction("LDA ({:02X}), Y", self.lda, self._mode_ind_y, 5, 0xB1)
 
 
     def lda(self, address :U16) -> bool:
