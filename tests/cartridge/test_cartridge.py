@@ -11,7 +11,7 @@ class TestNesCartridge(unittest.TestCase):
 
     def test_loading(self) -> None:
         zelda = Cartridge()
-        zelda.load(f"{TEST_DIR}/zelda/Zelda.nes")
+        zelda.load(f"{TEST_DIR}/zelda/Zelda.NES")
 
         self.assertEqual(zelda.magic_id, b"NES\x1A")
         self.assertEqual(zelda.prg_size, 0x1)
@@ -33,7 +33,7 @@ class TestNesCartridge(unittest.TestCase):
 
     def test_open_bus(self) -> None:
         zelda = Cartridge()
-        zelda.load(f"{TEST_DIR}/zelda/Zelda.nes")
+        zelda.load(f"{TEST_DIR}/zelda/Zelda.NES")
 
         self.assertEqual(zelda.magic_id, b"NES\x1A")
         self.assertEqual(zelda.prg_size, 0x1)

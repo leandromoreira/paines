@@ -23,7 +23,7 @@ class Test6502Instructions(unittest.TestCase):
 
     def test_reset(self) -> None:
         zelda = Cartridge()
-        zelda.load(f"{CARTRIDGE_PATH}zelda/Zelda.nes")
+        zelda.load(f"{CARTRIDGE_PATH}zelda/Zelda.NES")
 
         self.cpu.bus.cartridge = zelda
         cycles = self.cpu.reset()
