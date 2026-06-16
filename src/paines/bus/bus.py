@@ -23,16 +23,19 @@ from paines.types import U16, U8
 #    3F00h-3F1Fh   Background and Sprite Palettes (25 entries used)
 #    3F20h-3FFFh   Mirrors of 3F00h-3F1Fh
 
+
 class CPUBus:
-    def __init__(self, ram: RAM | None = None, cartridge: Cartridge | None = None) -> None:
-        self.ram = ram or ram_builder() # 0x0000 - 0x1FFF WRAM
-        self.open_bus :U8 = 0
-        self.cartridge = cartridge or cartridge_builder() # 0x4018 - 0xFFFF - Cartridge
+    def __init__(
+        self, ram: RAM | None = None, cartridge: Cartridge | None = None
+    ) -> None:
+        self.ram = ram or ram_builder()  # 0x0000 - 0x1FFF WRAM
+        self.open_bus: U8 = 0
+        self.cartridge = cartridge or cartridge_builder()  # 0x4018 - 0xFFFF - Cartridge
 
     def read(self, address: U16) -> U8:
         if address <= 0x1FFF:
-           self.open_bus = self.ram.read(address)
-           return self.open_bus
+            self.open_bus = self.ram.read(address)
+            return self.open_bus
 
         if address >= 0x4018 and address <= 0xFFFF:
             self.open_bus = self.cartridge.read(address, self.open_bus)
@@ -41,9 +44,9 @@ class CPUBus:
         return self.open_bus
 
     def peek(self, address: U16) -> U8:
-        dummy_open_bus :U8 = 0x00
+        dummy_open_bus: U8 = 0x00
         if address <= 0x1FFF:
-           return self.ram.read(address)
+            return self.ram.read(address)
 
         if address >= 0x4018 and address <= 0xFFFF:
             return self.cartridge.read(address, dummy_open_bus)
@@ -63,6 +66,7 @@ class CPUBus:
             return
 
         return
+
 
 def cpu_bus_builder() -> CPUBus:
     return CPUBus()

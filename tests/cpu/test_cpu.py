@@ -7,8 +7,9 @@ from paines.cpu.cpu import CPU6502
 from paines.cartridge.cartridge import Cartridge
 from paines.types import U16, U8
 
-START_PC :U16 = 0x0FFF
+START_PC: U16 = 0x0FFF
 CARTRIDGE_PATH = f"{Path(__file__).parent.parent}/cartridge/"
+
 
 class Test6502Instructions(unittest.TestCase):
     def setUp(self) -> None:
@@ -34,8 +35,8 @@ class Test6502Instructions(unittest.TestCase):
 
     def test_lda_immediate(self) -> None:
         self.write_bytes(START_PC, [0xA9, 0x42])
-        self.write_bytes(START_PC+2, [0xA9, 0x00])
-        self.write_bytes(START_PC+4, [0xA9, 0x80])
+        self.write_bytes(START_PC + 2, [0xA9, 0x00])
+        self.write_bytes(START_PC + 4, [0xA9, 0x80])
 
         self.cpu.execute()
 
@@ -86,7 +87,7 @@ class Test6502Instructions(unittest.TestCase):
         cycles = self.cpu.execute()
 
         self.assertEqual(self.cpu.a, 0xEE)
-        self.assertEqual(4 , cycles)
+        self.assertEqual(4, cycles)
 
     def test_lda_abs_x_cross(self) -> None:
         self.cpu.x = 0xBB
@@ -106,7 +107,7 @@ class Test6502Instructions(unittest.TestCase):
         cycles = self.cpu.execute()
 
         self.assertEqual(self.cpu.a, 0xEE)
-        self.assertEqual(4 , cycles)
+        self.assertEqual(4, cycles)
 
     def test_lda_ind_x(self) -> None:
         self.cpu.x = 0x20

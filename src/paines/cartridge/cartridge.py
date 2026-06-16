@@ -1,29 +1,32 @@
 from paines.types import U16, U8
+
 # https://problemkaputt.de/everynes.htm#techdata
 #   4018h-5FFFh   Cartridge Expansion Area almost 8K
 #   6000h-7FFFh   Cartridge SRAM Area 8K
 #   8000h-FFFFh   Cartridge PRG-ROM Area 32K
-CPU_PRG_START :U16 = 0x8000
-SRAM_START :U16 = 0x6000
-SRAM_END :U16 = 0x7FFF
-SRAM_MASK :U16 = SRAM_END-SRAM_START
-ONE_PRG_BANK :U16 = 0x4000
+CPU_PRG_START: U16 = 0x8000
+SRAM_START: U16 = 0x6000
+SRAM_END: U16 = 0x7FFF
+SRAM_MASK: U16 = SRAM_END - SRAM_START
+ONE_PRG_BANK: U16 = 0x4000
+
+
 class Cartridge:
     # https://www.nesdev.org/wiki/INES#iNES_file_format
     def __init__(self) -> None:
-        self.prg :list[U8] = []
-        self.chr :list[U8] = []
-        self.magic_id :bytes = b""
-        self.prg_size :U8 = 0
-        self.chr_size :U8 = 0
-        self.flags_6 :U8 = 0
-        self.has_battery_sram :bool = False
-        self.flags_7 :U8 = 0
-        self.prg_ram_size :U8 = 0
-        self.flags_9 :U8 = 0
-        self.flags_10 :U8 = 0
-        self.unused :bytes = b""
-        self.prg_mask :U16 = 0xFFFF
+        self.prg: list[U8] = []
+        self.chr: list[U8] = []
+        self.magic_id: bytes = b""
+        self.prg_size: U8 = 0
+        self.chr_size: U8 = 0
+        self.flags_6: U8 = 0
+        self.has_battery_sram: bool = False
+        self.flags_7: U8 = 0
+        self.prg_ram_size: U8 = 0
+        self.flags_9: U8 = 0
+        self.flags_10: U8 = 0
+        self.unused: bytes = b""
+        self.prg_mask: U16 = 0xFFFF
 
     def load(self, file: str) -> None:
         with open(file, "rb") as rom:
@@ -38,7 +41,7 @@ class Cartridge:
             self.flags_10 = header[10]
             self.unused = header[11:16]
 
-            self.has_battery_sram :bool = bool(self.flags_6 & 0x02)
+            self.has_battery_sram = bool(self.flags_6 & 0x02)
 
             self.prg = list(rom.read(ONE_PRG_BANK * self.prg_size))
             self.sram = [0] * (SRAM_END - SRAM_START + 1)
@@ -62,7 +65,6 @@ class Cartridge:
             self.prg[(address - CPU_PRG_START) & self.prg_mask] = value
             return
         return
-
 
 
 def cartridge_builder() -> Cartridge:
