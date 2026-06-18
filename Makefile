@@ -2,10 +2,8 @@ test:
 	uvx ruff format .
 	uv run --with pytest-cov pytest -s --cov=src/
 	uvx ty check
-	uvx ruff check .
-	uvx mypy .
-enforce_hint:
 	uvx ruff check . --select ANN --unsafe-fixes --fix
+	uvx mypy .
 build:
 	uv build
 audit:

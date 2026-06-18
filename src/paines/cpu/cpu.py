@@ -47,15 +47,14 @@ class CPU6502:
         self.total_cycle: int = 0
         self.debug = debug
         self.traces: list[str] = []
+        self.debug_file = open("output.txt", "a")
 
         self.instruction_set: dict[U8, Instruction] = {}
         self.init_table()
 
     def reset(self) -> U8:
-        self.pc = 0xFFFC
-        low = self.bus.read(self.pc)
-        self.pc += 1
-        high = self.bus.read(self.pc)
+        low = self.bus.read(0xFFFC)
+        high = self.bus.read(0xFFFD)
         self.pc = (high << 8) | low
         self.s = 0xFD
         self.p_irq = 0x1
@@ -204,8 +203,8 @@ class CPU6502:
         self.compose_p()
         log_line = f"{memory_slice[0].address:04X}  {bytes_str} {asm_trace}A:{self.a:02X} X:{self.x:02X} Y:{self.y:02X} P:{self.p:02X} SP:{self.s:02X}"
 
-        with open("output.txt", "a") as file:
-            file.write(f"{log_line}\n")
+        self.debug_file.write(f"{log_line}\n")
+        self.debug_file.flush()
         self.traces.append(log_line)
 
     def init_table(self) -> None:
