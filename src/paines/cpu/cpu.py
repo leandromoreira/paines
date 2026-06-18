@@ -257,6 +257,18 @@ class CPU6502:
         self.instruction_set[0xB1] = Instruction(
             "LDA ({:02X}), Y", self.lda, self._mode_ind_y, 5, 0xB1
         )
+        self.instruction_set[0xA6] = Instruction(
+            "LDX {:02X}", self.ldx, self._mode_zp, 3, 0xA6
+        )
+        self.instruction_set[0xB6] = Instruction(
+            "LDX {:02X}, Y", self.ldx, self._mode_zp_y, 4, 0xB6
+        )
+        self.instruction_set[0xAE] = Instruction(
+            "LDX {:04X}", self.ldx, self._mode_abs, 4, 0xAE
+        )
+        self.instruction_set[0xBE] = Instruction(
+            "LDX {:04X}, Y", self.ldx, self._mode_abs_y, 4, 0xBE
+        )
 
     def lda(self, address: U16) -> bool:
         operand: U8 = self.bus.read(address)
