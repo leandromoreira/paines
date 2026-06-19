@@ -343,3 +343,37 @@ class Test6502Instructions(unittest.TestCase):
         self.cpu.execute()
 
         self.assertEqual(0xFC, self.cpu.bus.read(0x0C0F + self.cpu.y))
+
+    def test_stx_zp(self) -> None:
+        self.cpu.x = 0xFC
+        self.write_bytes(START_PC, [0x86, 0x10])
+        self.write_bytes(0x10, [0xEA])
+
+        self.assertEqual(0xEA, self.cpu.bus.read(0x0010))
+
+        self.cpu.execute()
+
+        self.assertEqual(0xFC, self.cpu.bus.read(0x0010))
+
+    def test_stx_zp_y(self) -> None:
+        self.cpu.x = 0xFC
+        self.cpu.y = 0x0A
+        self.write_bytes(START_PC, [0x96, 0x10])
+        self.write_bytes(0x10 + self.cpu.y, [0xEA])
+
+        self.assertEqual(0xEA, self.cpu.bus.read(0x0010 + self.cpu.y))
+
+        self.cpu.execute()
+
+        self.assertEqual(0xFC, self.cpu.bus.read(0x0010 + + self.cpu.y))
+
+    def test_stx_abs(self) -> None:
+        self.cpu.x = 0xFC
+        self.write_bytes(START_PC, [0x8E, 0x10, 0x02])
+        self.write_bytes(0x0210, [0xEA])
+
+        self.assertEqual(0xEA, self.cpu.bus.read(0x0210))
+
+        self.cpu.execute()
+
+        self.assertEqual(0xFC, self.cpu.bus.read(0x0210))
