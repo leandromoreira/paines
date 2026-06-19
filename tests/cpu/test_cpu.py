@@ -278,3 +278,68 @@ class Test6502Instructions(unittest.TestCase):
         self.cpu.execute()
 
         self.assertEqual(self.cpu.s, 0x69)
+
+    def test_sta_zp(self) -> None:
+        self.cpu.a = 0xDF
+        self.write_bytes(START_PC, [0x85, 0x10])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDF, self.cpu.bus.read(0x10))
+
+    def test_sta_zp_x(self) -> None:
+        self.cpu.a = 0xDF
+        self.cpu.x = 0x10
+        self.write_bytes(START_PC, [0x95, 0x10])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDF, self.cpu.bus.read(0x10 + self.cpu.x))
+
+    def test_sta_abs(self) -> None:
+        self.cpu.a = 0xDF
+        self.write_bytes(START_PC, [0x8D, 0x10, 0x0F])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDF, self.cpu.bus.read(0x0F10))
+
+    def test_sta_abs_x(self) -> None:
+        self.cpu.a = 0xDF
+        self.cpu.x = 0x05
+        self.write_bytes(START_PC, [0x9D, 0x10, 0x0F])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDF, self.cpu.bus.read(0x0F10 + self.cpu.x))
+
+    def test_sta_abs_y(self) -> None:
+        self.cpu.a = 0xDF
+        self.cpu.y = 0x05
+        self.write_bytes(START_PC, [0x99, 0x10, 0x0F])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDF, self.cpu.bus.read(0x0F10 + self.cpu.y))
+
+    def test_sta_ind_x(self) -> None:
+        self.cpu.a = 0xDF
+        self.cpu.x = 0x05
+        self.write_bytes(START_PC, [0x81, 0x10])
+        self.write_bytes(0x10 + 0x05, [0x0F, 0x0A])
+        self.write_bytes(0x0A0F, [0xFA])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDF, self.cpu.bus.read(0x0A0F))
+
+    def test_sta_ind_y(self) -> None:
+        self.cpu.a = 0xFC
+        self.cpu.y = 0x05
+        self.write_bytes(START_PC, [0x91, 0x10])
+        self.write_bytes(0x10, [0x0F, 0x0C])
+        self.write_bytes(0x0C0F + self.cpu.y, [0xA2])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xFC, self.cpu.bus.read(0x0C0F + self.cpu.y))

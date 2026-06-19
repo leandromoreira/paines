@@ -282,6 +282,32 @@ class CPU6502:
             "LDX {:04X}, Y", self.ldx, self._mode_abs_y, 4, 0xBE
         )
 
+        self.instruction_set[0x85] = Instruction(
+            "STA {:02X}", self.sta, self._mode_zp, 3, 0x85
+        )
+        self.instruction_set[0x95] = Instruction(
+            "STA {:02X}, X", self.sta, self._mode_zp_x, 4, 0x95
+        )
+        self.instruction_set[0x8D] = Instruction(
+            "STA {:04X}", self.sta, self._mode_abs, 4, 0x8D
+        )
+        self.instruction_set[0x9D] = Instruction(
+            "STA {:04X}, X", self.sta, self._mode_abs_x, 5, 0x9D
+        )
+        self.instruction_set[0x99] = Instruction(
+            "STA {:04X}, Y", self.sta, self._mode_abs_y, 5, 0x99
+        )
+        self.instruction_set[0x81] = Instruction(
+            "STA ({:02X}, X)", self.sta, self._mode_ind_x, 6, 0x81
+        )
+        self.instruction_set[0x91] = Instruction(
+            "STA ({:02X}), Y", self.sta, self._mode_ind_y, 6, 0x91
+        )
+
+    def sta(self, address: U16) -> bool:
+        self.bus.write(address, self.a)
+        return False
+
     def lda(self, address: U16) -> bool:
         operand: U8 = self.bus.read(address)
         self.a = operand
