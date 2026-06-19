@@ -410,3 +410,42 @@ class Test6502Instructions(unittest.TestCase):
         self.cpu.execute()
 
         self.assertEqual(0xFC, self.cpu.bus.read(0x0210))
+
+    def test_pha(self) -> None:
+        self.cpu.a = 0xFC
+        self.write_bytes(START_PC, [0x48])
+        self.write_bytes(0x01FC, [0xEA])
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.a, self.cpu.bus.read(0x0100 | (self.cpu.s + 1)))
+
+    def test_php(self) -> None:
+        self.cpu.p = 0b1000100
+        self.write_bytes(START_PC, [0x08])
+        self.write_bytes(0x01FC, [0xEA])
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.p, self.cpu.bus.read(0x0100 | (self.cpu.s + 1)))
+
+    def test_pla(self) -> None:
+        self.cpu.s = 0xAB
+        self.write_bytes(START_PC, [0x68])
+        self.write_bytes(0x1AC, [0xDC])
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.a, 0xDC)
+
+    def test_plp(self) -> None:
+        self.cpu.p = 0xAB
+        self.write_bytes(START_PC, [0x28])
+        self.write_bytes(0x1FE, [0b10101010])
+
+        self.cpu.execute()
+
+        self.assertEqual(self.cpu.p_carry, 0x0)
+        self.assertEqual(self.cpu.p_zero, 0x1)
+        self.assertEqual(self.cpu.p_irq, 0x0)
+        self.assertEqual(self.cpu.p_dcm, 0x1)

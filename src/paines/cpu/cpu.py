@@ -322,6 +322,50 @@ class CPU6502:
             "STY {:04X}", self.sty, self._mode_abs, 4, 0x8C
         )
 
+        self.instruction_set[0x48] = Instruction(
+            "PHA", self.pha, self._mode_implied, 3, 0x48
+        )
+        self.instruction_set[0x08] = Instruction(
+            "PHP", self.php, self._mode_implied, 3, 0x08
+        )
+        self.instruction_set[0x68] = Instruction(
+            "PLA", self.pla, self._mode_implied, 4, 0x68
+        )
+        self.instruction_set[0x28] = Instruction(
+            "PLP", self.plp, self._mode_implied, 4, 0x28
+        )
+
+    def plp(self, _: U16) -> bool:
+        self.s = (self.s + 1) & 0xFF
+        self.p = self.bus.read(0x0100 | self.s)
+
+        self.p_carry = self.p & 0x1
+        self.p_zero = (self.p >> 1) & 0x1
+        self.p_irq = (self.p >> 2) & 0x1
+        self.p_dcm = (self.p >> 3) & 0x1
+        self.p_brk = (self.p >> 4) & 0x1
+        self.p_unused = (self.p >> 5) & 0x1
+        self.p_overflow = (self.p >> 6) & 0x1
+        self.p_sign = (self.p >> 7) & 0x1
+
+        return False
+
+    def pla(self, _: U16) -> bool:
+        self.s = (self.s + 1) & 0xFF
+        self.a = self.bus.read(0x0100 | self.s)
+        self.check_nz(self.a)
+        return False
+
+    def php(self, _: U16) -> bool:
+        self.bus.write(0x0100 | self.s, self.p)
+        self.s = (self.s - 1) & 0xFF
+        return False
+
+    def pha(self, _: U16) -> bool:
+        self.bus.write(0x0100 | self.s, self.a)
+        self.s = (self.s - 1) & 0xFF
+        return False
+
     def sty(self, address: U16) -> bool:
         self.bus.write(address, self.y)
         return False
