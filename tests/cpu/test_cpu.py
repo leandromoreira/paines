@@ -224,7 +224,6 @@ class Test6502Instructions(unittest.TestCase):
 
         self.assertEqual(0xF1, self.cpu.y)
 
-
     def test_tay(self) -> None:
         self.write_bytes(START_PC, [0xA8])
         self.cpu.a = 0x69
@@ -365,7 +364,7 @@ class Test6502Instructions(unittest.TestCase):
 
         self.cpu.execute()
 
-        self.assertEqual(0xFC, self.cpu.bus.read(0x0010 + + self.cpu.y))
+        self.assertEqual(0xFC, self.cpu.bus.read(0x0010 + self.cpu.y))
 
     def test_stx_abs(self) -> None:
         self.cpu.x = 0xFC
