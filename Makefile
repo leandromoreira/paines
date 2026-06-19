@@ -1,4 +1,5 @@
 test:
+	rm -f output.txt
 	uvx ruff format .
 	uv run --with pytest-cov pytest -s --cov=src/
 	uvx ty check
