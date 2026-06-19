@@ -190,6 +190,41 @@ class Test6502Instructions(unittest.TestCase):
 
         self.assertEqual(self.cpu.y, 0x69)
 
+    def test_ldy_zp(self) -> None:
+        self.write_bytes(START_PC, [0xA4, 0x03])
+        self.write_bytes(0x03, [0xF1])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xF1, self.cpu.y)
+
+    def test_ldy_zp_x(self) -> None:
+        self.cpu.x = 0xCA
+        self.write_bytes(START_PC, [0xB4, 0x03])
+        self.write_bytes(0x03 + self.cpu.x, [0xF1])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xF1, self.cpu.y)
+
+    def test_ldy_abs(self) -> None:
+        self.write_bytes(START_PC, [0xAC, 0x03, 0x02])
+        self.write_bytes(0x0203, [0xF1])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xF1, self.cpu.y)
+
+    def test_ldy_abs_ind(self) -> None:
+        self.cpu.x = 0x2
+        self.write_bytes(START_PC, [0xBC, 0x03, 0x02])
+        self.write_bytes(0x0203 + self.cpu.x, [0xF1])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xF1, self.cpu.y)
+
+
     def test_tay(self) -> None:
         self.write_bytes(START_PC, [0xA8])
         self.cpu.a = 0x69

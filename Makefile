@@ -16,3 +16,6 @@ complexity:
 
 complexity_details:
 	uvx radon cc . -a -s
+
+tdd:
+	uv run --with pytest-watcher ptw .

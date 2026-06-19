@@ -235,6 +235,18 @@ class CPU6502:
         self.instruction_set[0xA0] = Instruction(
             "LDY #{:02X}", self.ldy, self._mode_imm, 2, 0xA0
         )
+        self.instruction_set[0xA4] = Instruction(
+            "LDY {:02X}", self.ldy, self._mode_zp, 3, 0xA4
+        )
+        self.instruction_set[0xB4] = Instruction(
+            "LDY {:02X}, X", self.ldy, self._mode_zp_x, 4, 0xB4
+        )
+        self.instruction_set[0xAC] = Instruction(
+            "LDY {:04X}", self.ldy, self._mode_abs, 4, 0xAC
+        )
+        self.instruction_set[0xBC] = Instruction(
+            "LDY {:04X}, X", self.ldy, self._mode_abs_x, 4, 0xBC
+        )
 
         self.instruction_set[0xA5] = Instruction(
             "LDA {:02X}", self.lda, self._mode_zp, 3, 0xA5
