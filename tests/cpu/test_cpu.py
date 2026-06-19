@@ -376,3 +376,37 @@ class Test6502Instructions(unittest.TestCase):
         self.cpu.execute()
 
         self.assertEqual(0xFC, self.cpu.bus.read(0x0210))
+
+    def test_sty_zp(self) -> None:
+        self.cpu.y = 0xFC
+        self.write_bytes(START_PC, [0x84, 0x10])
+        self.write_bytes(0x10, [0xEA])
+
+        self.assertEqual(0xEA, self.cpu.bus.read(0x0010))
+
+        self.cpu.execute()
+
+        self.assertEqual(0xFC, self.cpu.bus.read(0x0010))
+
+    def test_sty_zp_x(self) -> None:
+        self.cpu.y = 0xFC
+        self.cpu.x = 0x0A
+        self.write_bytes(START_PC, [0x94, 0x10])
+        self.write_bytes(0x10 + self.cpu.x, [0xEA])
+
+        self.assertEqual(0xEA, self.cpu.bus.read(0x0010 + self.cpu.x))
+
+        self.cpu.execute()
+
+        self.assertEqual(0xFC, self.cpu.bus.read(0x0010 + self.cpu.x))
+
+    def test_sty_abs(self) -> None:
+        self.cpu.y = 0xFC
+        self.write_bytes(START_PC, [0x8C, 0x10, 0x02])
+        self.write_bytes(0x0210, [0xEA])
+
+        self.assertEqual(0xEA, self.cpu.bus.read(0x0210))
+
+        self.cpu.execute()
+
+        self.assertEqual(0xFC, self.cpu.bus.read(0x0210))

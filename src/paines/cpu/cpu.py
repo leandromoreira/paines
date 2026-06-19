@@ -312,6 +312,19 @@ class CPU6502:
         self.instruction_set[0x8E] = Instruction(
             "STX {:04X}", self.stx, self._mode_abs, 4, 0x8E
         )
+        self.instruction_set[0x84] = Instruction(
+            "STY {:02X}", self.sty, self._mode_zp, 3, 0x84
+        )
+        self.instruction_set[0x94] = Instruction(
+            "STY {:02X}, X", self.sty, self._mode_zp_x, 4, 0x94
+        )
+        self.instruction_set[0x8C] = Instruction(
+            "STY {:04X}", self.sty, self._mode_abs, 4, 0x8C
+        )
+
+    def sty(self, address: U16) -> bool:
+        self.bus.write(address, self.y)
+        return False
 
     def stx(self, address: U16) -> bool:
         self.bus.write(address, self.x)
