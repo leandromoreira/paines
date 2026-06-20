@@ -449,3 +449,7 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(self.cpu.p_zero, 0x1)
         self.assertEqual(self.cpu.p_irq, 0x0)
         self.assertEqual(self.cpu.p_dcm, 0x1)
+        self.assertEqual(self.cpu.p_brk, 0x0)
+        self.assertEqual(self.cpu.p_unused, 0x1)
+        self.assertEqual(self.cpu.p_overflow, 0x0)
+        self.assertEqual(self.cpu.p_sign, 0x1)
