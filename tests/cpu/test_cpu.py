@@ -609,3 +609,31 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(0, self.cpu.p_overflow)
         self.assertEqual(0, self.cpu.p_sign)
         self.assertEqual(0, self.cpu.p_zero)
+
+    def test_and(self) -> None:
+        self.cpu.a = 0b1010
+        self.write_bytes(START_PC, [0x29, 0b0011])
+
+        self.cpu.execute()
+
+        self.assertEqual(0b10, self.cpu.a)
+
+    def test_ora(self) -> None:
+        self.cpu.a = 0b10100000
+        self.write_bytes(START_PC, [0x09, 0b01100011])
+
+        self.cpu.execute()
+
+        self.assertEqual(0b11100011, self.cpu.a)
+        self.assertEqual(0, self.cpu.p_zero)
+        self.assertEqual(1, self.cpu.p_sign)
+
+    def test_eor(self) -> None:
+        self.cpu.a = 0xFF
+        self.write_bytes(START_PC, [0x49, 0xFF])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x00, self.cpu.a)
+        self.assertEqual(1, self.cpu.p_zero)
+        self.assertEqual(0, self.cpu.p_sign)

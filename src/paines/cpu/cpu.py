@@ -382,6 +382,96 @@ class CPU6502:
         self.instruction_set[0xF1] = Instruction(
             "SBC ({:02X}), Y", self.sbc, self._mode_ind_y, 5, 0xF1
         )
+        self.instruction_set[0x29] = Instruction(
+            "AND #{:02X}", self.op_and, self._mode_imm, 2, 0x29
+        )
+        self.instruction_set[0x25] = Instruction(
+            "AND {:02X}", self.op_and, self._mode_zp, 3, 0x25
+        )
+        self.instruction_set[0x35] = Instruction(
+            "AND {:02X}, X", self.op_and, self._mode_zp_x, 4, 0x35
+        )
+        self.instruction_set[0x2D] = Instruction(
+            "AND {:04X}", self.op_and, self._mode_abs, 4, 0x2D
+        )
+        self.instruction_set[0x3D] = Instruction(
+            "AND {:04X}, X", self.op_and, self._mode_abs_x, 4, 0x3D
+        )
+        self.instruction_set[0x39] = Instruction(
+            "AND {:04X}, Y", self.op_and, self._mode_abs_y, 4, 0x39
+        )
+        self.instruction_set[0x21] = Instruction(
+            "AND ({:02X}, X)", self.op_and, self._mode_ind_x, 6, 0x21
+        )
+        self.instruction_set[0x31] = Instruction(
+            "AND ({:02X}), Y", self.op_and, self._mode_ind_y, 5, 0x31
+        )
+        self.instruction_set[0x09] = Instruction(
+            "ORA #{:02X}", self.op_or, self._mode_imm, 2, 0x09
+        )
+        self.instruction_set[0x05] = Instruction(
+            "ORA {:02X}", self.op_or, self._mode_zp, 3, 0x05
+        )
+        self.instruction_set[0x15] = Instruction(
+            "ORA {:02X}, X", self.op_or, self._mode_zp_x, 4, 0x15
+        )
+        self.instruction_set[0x0D] = Instruction(
+            "ORA {:04X}", self.op_or, self._mode_abs, 4, 0x0D
+        )
+        self.instruction_set[0x1D] = Instruction(
+            "ORA {:04X}, X", self.op_or, self._mode_abs_x, 4, 0x1D
+        )
+        self.instruction_set[0x19] = Instruction(
+            "ORA {:04X}, Y", self.op_or, self._mode_abs_y, 4, 0x19
+        )
+        self.instruction_set[0x01] = Instruction(
+            "ORA ({:02X}, X)", self.op_or, self._mode_ind_x, 6, 0x01
+        )
+        self.instruction_set[0x11] = Instruction(
+            "ORA ({:02X}), Y", self.op_or, self._mode_ind_y, 5, 0x11
+        )
+        self.instruction_set[0x49] = Instruction(
+            "EOR #{:02X}", self.op_xor, self._mode_imm, 2, 0x49
+        )
+        self.instruction_set[0x45] = Instruction(
+            "EOR {:02X}", self.op_xor, self._mode_zp, 3, 0x45
+        )
+        self.instruction_set[0x55] = Instruction(
+            "EOR {:02X}, X", self.op_xor, self._mode_zp_x, 4, 0x55
+        )
+        self.instruction_set[0x4D] = Instruction(
+            "EOR {:04X}", self.op_xor, self._mode_abs, 4, 0x4D
+        )
+        self.instruction_set[0x5D] = Instruction(
+            "EOR {:04X}, X", self.op_xor, self._mode_abs_x, 4, 0x5D
+        )
+        self.instruction_set[0x59] = Instruction(
+            "EOR {:04X}, Y", self.op_xor, self._mode_abs_y, 4, 0x59
+        )
+        self.instruction_set[0x41] = Instruction(
+            "EOR ({:02X}, X)", self.op_xor, self._mode_ind_x, 6, 0x41
+        )
+        self.instruction_set[0x51] = Instruction(
+            "EOR ({:02X}), Y", self.op_xor, self._mode_ind_y, 5, 0x51
+        )
+
+    def op_or(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        self.a = self.a | value
+        self.check_nz(self.a)
+        return True
+
+    def op_xor(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        self.a = self.a ^ value
+        self.check_nz(self.a)
+        return True
+
+    def op_and(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        self.a = self.a & value
+        self.check_nz(self.a)
+        return True
 
     def sbc(self, address: U16) -> bool:
         value: U8 = self.bus.read(address)
