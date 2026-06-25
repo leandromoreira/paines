@@ -637,3 +637,33 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(0x00, self.cpu.a)
         self.assertEqual(1, self.cpu.p_zero)
         self.assertEqual(0, self.cpu.p_sign)
+
+    def test_cmp(self) -> None:
+        self.cpu.a = 0x01
+        self.write_bytes(START_PC, [0xC9, 0x02])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x1, self.cpu.p_sign)
+        self.assertEqual(0x0, self.cpu.p_zero)
+        self.assertEqual(0x0, self.cpu.p_carry)
+
+    def test_cmp_x(self) -> None:
+        self.cpu.x = 0x01
+        self.write_bytes(START_PC, [0xE0, 0x02])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x1, self.cpu.p_sign)
+        self.assertEqual(0x0, self.cpu.p_zero)
+        self.assertEqual(0x0, self.cpu.p_carry)
+
+    def test_cmp_y(self) -> None:
+        self.cpu.y = 0x01
+        self.write_bytes(START_PC, [0xC0, 0x02])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x1, self.cpu.p_sign)
+        self.assertEqual(0x0, self.cpu.p_zero)
+        self.assertEqual(0x0, self.cpu.p_carry)

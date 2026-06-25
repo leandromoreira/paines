@@ -454,6 +454,75 @@ class CPU6502:
         self.instruction_set[0x51] = Instruction(
             "EOR ({:02X}), Y", self.op_xor, self._mode_ind_y, 5, 0x51
         )
+        self.instruction_set[0xC9] = Instruction(
+            "CMP #{:02X}", self.cmp, self._mode_imm, 2, 0xC9
+        )
+        self.instruction_set[0xC9] = Instruction(
+            "CMP #{:02X}", self.cmp, self._mode_imm, 2, 0xC9
+        )
+        self.instruction_set[0xC5] = Instruction(
+            "CMP {:02X}", self.cmp, self._mode_zp, 3, 0xC5
+        )
+        self.instruction_set[0xD5] = Instruction(
+            "CMP {:02X}, X", self.cmp, self._mode_zp_x, 4, 0xD5
+        )
+        self.instruction_set[0xCD] = Instruction(
+            "CMP {:04X}", self.cmp, self._mode_abs, 4, 0xCD
+        )
+        self.instruction_set[0xDD] = Instruction(
+            "CMP {:04X}, X", self.cmp, self._mode_abs_x, 4, 0xDD
+        )
+        self.instruction_set[0xD9] = Instruction(
+            "CMP {:04X}, Y", self.cmp, self._mode_abs_y, 4, 0xD9
+        )
+        self.instruction_set[0xC1] = Instruction(
+            "CMP ({:02X}, X)", self.cmp, self._mode_ind_x, 6, 0xC1
+        )
+        self.instruction_set[0xD1] = Instruction(
+            "CMP ({:02X}), Y", self.cmp, self._mode_ind_y, 5, 0xD1
+        )
+        self.instruction_set[0xE0] = Instruction(
+            "CPX #{:02X}", self.cpx, self._mode_imm, 2, 0xE0
+        )
+        self.instruction_set[0xE4] = Instruction(
+            "CPX {:02X}", self.cpx, self._mode_zp, 3, 0xE4
+        )
+        self.instruction_set[0xEC] = Instruction(
+            "CPX {:04X}", self.cpx, self._mode_abs, 4, 0xEC
+        )
+        self.instruction_set[0xC0] = Instruction(
+            "CPY #{:02X}", self.cpy, self._mode_imm, 2, 0xC0
+        )
+        self.instruction_set[0xC4] = Instruction(
+            "CPY {:02X}", self.cpy, self._mode_zp, 3, 0xC4
+        )
+        self.instruction_set[0xCC] = Instruction(
+            "CPY {:04X}", self.cpy, self._mode_abs, 4, 0xCC
+        )
+
+    def cpy(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        result: U8 = (self.y - value) & 0xFF
+        self.p_sign = (result >> 7) & 0x1
+        self.p_carry = 1 if self.y >= value else 0
+        self.p_zero = 1 if self.y == value else 0
+        return False
+
+    def cpx(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        result: U8 = (self.x - value) & 0xFF
+        self.p_sign = (result >> 7) & 0x1
+        self.p_carry = 1 if self.x >= value else 0
+        self.p_zero = 1 if self.x == value else 0
+        return False
+
+    def cmp(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        result: U8 = (self.a - value) & 0xFF
+        self.p_sign = (result >> 7) & 0x1
+        self.p_carry = 1 if self.a >= value else 0
+        self.p_zero = 1 if self.a == value else 0
+        return True
 
     def op_or(self, address: U16) -> bool:
         value: U8 = self.bus.read(address)
