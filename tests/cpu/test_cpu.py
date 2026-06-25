@@ -453,3 +453,146 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(self.cpu.p_unused, 0x1)
         self.assertEqual(self.cpu.p_overflow, 0x0)
         self.assertEqual(self.cpu.p_sign, 0x1)
+
+    def test_adc(self) -> None:
+        self.cpu.a = 0xAB
+        self.cpu.p_carry = 0x0
+        self.write_bytes(START_PC, [0x69, 0xA0])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x4B, self.cpu.a)
+        self.assertEqual(0x0, self.cpu.p_zero)
+        self.assertEqual(0x1, self.cpu.p_carry)
+        self.assertEqual(0x0, self.cpu.p_sign)
+        self.assertEqual(0x1, self.cpu.p_overflow)
+
+    def test_adc_normal_positive(self) -> None:
+        self.cpu.a = 0x20
+        self.cpu.p_carry = 0
+        self.write_bytes(START_PC, [0x69, 0x10])
+        self.cpu.execute()
+
+        self.assertEqual(0x30, self.cpu.a)
+        self.assertEqual(0, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_overflow)
+        self.assertEqual(0, self.cpu.p_sign)
+        self.assertEqual(0, self.cpu.p_zero)
+
+    def test_adc_with_carry_in(self) -> None:
+        self.cpu.a = 0x20
+        self.cpu.p_carry = 1
+        self.write_bytes(START_PC, [0x69, 0x10])
+        self.cpu.execute()
+
+        self.assertEqual(0x31, self.cpu.a)
+        self.assertEqual(0, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_overflow)
+        self.assertEqual(0, self.cpu.p_sign)
+        self.assertEqual(0, self.cpu.p_zero)
+
+    def test_adc_unsigned_overflow_carry_out(self) -> None:
+        self.cpu.a = 0xFF
+        self.cpu.p_carry = 0
+        self.write_bytes(START_PC, [0x69, 0x01])
+        self.cpu.execute()
+
+        self.assertEqual(0x00, self.cpu.a)
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_overflow)
+        self.assertEqual(0, self.cpu.p_sign)
+        self.assertEqual(1, self.cpu.p_zero)
+
+    def test_adc_signed_overflow_positive(self) -> None:
+        self.cpu.a = 0x7F
+        self.cpu.p_carry = 0
+        self.write_bytes(START_PC, [0x69, 0x01])
+        self.cpu.execute()
+
+        self.assertEqual(0x80, self.cpu.a)
+        self.assertEqual(0, self.cpu.p_carry)
+        self.assertEqual(1, self.cpu.p_overflow)
+        self.assertEqual(1, self.cpu.p_sign)
+        self.assertEqual(0, self.cpu.p_zero)
+
+    def test_adc_signed_overflow_negative(self) -> None:
+        self.cpu.a = 0x80
+        self.cpu.p_carry = 0
+        self.write_bytes(START_PC, [0x69, 0xFF])
+        self.cpu.execute()
+
+        self.assertEqual(0x7F, self.cpu.a)
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(1, self.cpu.p_overflow)
+        self.assertEqual(0, self.cpu.p_sign)
+        self.assertEqual(0, self.cpu.p_zero)
+
+    def test_adc_zp(self) -> None:
+        self.cpu.a = 0xAB
+        self.cpu.p_carry = 0x0
+        self.write_bytes(START_PC, [0x65, 0xA0])
+        self.write_bytes(0xA0, [0x01])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xAC, self.cpu.a)
+        self.assertEqual(0x0, self.cpu.p_zero)
+        self.assertEqual(0x0, self.cpu.p_carry)
+        self.assertEqual(0x1, self.cpu.p_sign)
+        self.assertEqual(0x0, self.cpu.p_overflow)
+
+    def test_adc_zp_x(self) -> None:
+        self.cpu.a = 0xAB
+        self.cpu.x = 0x1
+        self.cpu.p_carry = 0x0
+        self.write_bytes(START_PC, [0x75, 0xA0])
+        self.write_bytes(0xA0 + self.cpu.x, [0x02])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xAD, self.cpu.a)
+        self.assertEqual(0x0, self.cpu.p_zero)
+        self.assertEqual(0x0, self.cpu.p_carry)
+        self.assertEqual(0x1, self.cpu.p_sign)
+        self.assertEqual(0x0, self.cpu.p_overflow)
+
+    def test_adc_abs(self) -> None:
+        self.cpu.a = 0xDC
+        self.write_bytes(START_PC, [0x6D, 0xA0, 0x03])
+        self.write_bytes(0x03A0, [0x01])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDD, self.cpu.a)
+
+    def test_adc_abs_x(self) -> None:
+        self.cpu.a = 0xDC
+        self.cpu.x = 0x2
+        self.write_bytes(START_PC, [0x7D, 0xA0, 0x03])
+        self.write_bytes(0x03A0 + self.cpu.x, [0x01])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDD, self.cpu.a)
+
+    def test_adc_ind_x(self) -> None:
+        self.cpu.a = 0xDC
+        self.cpu.x = 0x2
+        self.write_bytes(START_PC, [0x61, 0xA0])
+        self.write_bytes(0xA0 + self.cpu.x, [0x01, 0x03])
+        self.write_bytes(0x0301, [0x02])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDE, self.cpu.a)
+
+    def test_adc_ind_y(self) -> None:
+        self.cpu.a = 0xDC
+        self.cpu.y = 0x2
+        self.write_bytes(START_PC, [0x71, 0xA0])
+        self.write_bytes(0xA0, [0x01, 0x03])
+        self.write_bytes(0x0301 + self.cpu.y, [0x02])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDE, self.cpu.a)

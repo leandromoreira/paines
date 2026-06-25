@@ -334,6 +334,49 @@ class CPU6502:
         self.instruction_set[0x28] = Instruction(
             "PLP", self.plp, self._mode_implied, 4, 0x28
         )
+        self.instruction_set[0x69] = Instruction(
+            "ADC #{:02X}", self.adc, self._mode_imm, 2, 0x69
+        )
+        self.instruction_set[0x65] = Instruction(
+            "ADC {:02X}", self.adc, self._mode_zp, 3, 0x65
+        )
+        self.instruction_set[0x75] = Instruction(
+            "ADC {:02X}, X", self.adc, self._mode_zp_x, 4, 0x75
+        )
+        self.instruction_set[0x6D] = Instruction(
+            "ADC {:04X}", self.adc, self._mode_abs, 4, 0x6D
+        )
+        self.instruction_set[0x7D] = Instruction(
+            "ADC {:04X}, X", self.adc, self._mode_abs_x, 4, 0x7D
+        )
+        self.instruction_set[0x79] = Instruction(
+            "ADC {:04X}, Y", self.adc, self._mode_abs_y, 4, 0x79
+        )
+        self.instruction_set[0x61] = Instruction(
+            "ADC ({:02X}, X)", self.adc, self._mode_ind_x, 6, 0x61
+        )
+        self.instruction_set[0x71] = Instruction(
+            "ADC ({:02X}), Y", self.adc, self._mode_ind_y, 5, 0x71
+        )
+
+    def adc(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        raw_result: int = self.a + value + self.p_carry
+        result: U16 = raw_result & 0xFF
+
+        if raw_result > 0xFF:
+            self.p_carry = 1
+        else:
+            self.p_carry = 0
+
+        if (self.a ^ result) & (value ^ result) & 0x80:
+            self.p_overflow = 1
+        else:
+            self.p_overflow = 0
+
+        self.a = result
+        self.check_nz(self.a)
+        return True
 
     def plp(self, _: U16) -> bool:
         self.s = (self.s + 1) & 0xFF
