@@ -409,7 +409,6 @@ class CPU6502:
         self.check_nz(self.a)
         return True
 
-
     def plp(self, _: U16) -> bool:
         self.s = (self.s + 1) & 0xFF
         self.p = self.bus.read(0x0100 | self.s)
