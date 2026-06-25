@@ -358,9 +358,40 @@ class CPU6502:
         self.instruction_set[0x71] = Instruction(
             "ADC ({:02X}), Y", self.adc, self._mode_ind_y, 5, 0x71
         )
+        self.instruction_set[0xE9] = Instruction(
+            "SBC #{:02X}", self.sbc, self._mode_imm, 2, 0xE9
+        )
+        self.instruction_set[0xE5] = Instruction(
+            "SBC {:02X}", self.sbc, self._mode_zp, 3, 0xE5
+        )
+        self.instruction_set[0xF5] = Instruction(
+            "SBC {:02X}, X", self.sbc, self._mode_zp_x, 4, 0xF5
+        )
+        self.instruction_set[0xED] = Instruction(
+            "SBC {:04X}", self.sbc, self._mode_abs, 4, 0xED
+        )
+        self.instruction_set[0xFD] = Instruction(
+            "SBC {:04X}, X", self.sbc, self._mode_abs_x, 4, 0xFD
+        )
+        self.instruction_set[0xF9] = Instruction(
+            "SBC {:04X}, Y", self.sbc, self._mode_abs_y, 4, 0xF9
+        )
+        self.instruction_set[0xE1] = Instruction(
+            "SBC ({:02X}, X)", self.sbc, self._mode_ind_x, 6, 0xE1
+        )
+        self.instruction_set[0xF1] = Instruction(
+            "SBC ({:02X}), Y", self.sbc, self._mode_ind_y, 5, 0xF1
+        )
+
+    def sbc(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        return self._adc(value ^ 0xFF)
 
     def adc(self, address: U16) -> bool:
         value: U8 = self.bus.read(address)
+        return self._adc(value)
+
+    def _adc(self, value: U8) -> bool:
         raw_result: int = self.a + value + self.p_carry
         result: U16 = raw_result & 0xFF
 
@@ -377,6 +408,7 @@ class CPU6502:
         self.a = result
         self.check_nz(self.a)
         return True
+
 
     def plp(self, _: U16) -> bool:
         self.s = (self.s + 1) & 0xFF

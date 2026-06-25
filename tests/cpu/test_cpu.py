@@ -596,3 +596,16 @@ class Test6502Instructions(unittest.TestCase):
         self.cpu.execute()
 
         self.assertEqual(0xDE, self.cpu.a)
+
+    def test_sbc(self) -> None:
+        self.cpu.a = 0xAB
+        self.cpu.p_carry = 0x1
+        self.write_bytes(START_PC, [0xE9, 0xA0])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xB, self.cpu.a)
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_overflow)
+        self.assertEqual(0, self.cpu.p_sign)
+        self.assertEqual(0, self.cpu.p_zero)
