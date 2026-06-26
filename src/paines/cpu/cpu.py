@@ -499,6 +499,19 @@ class CPU6502:
         self.instruction_set[0xCC] = Instruction(
             "CPY {:04X}", self.cpy, self._mode_abs, 4, 0xCC
         )
+        self.instruction_set[0x24] = Instruction(
+            "BIT {:02X}", self.bit, self._mode_zp, 3, 0x24
+        )
+        self.instruction_set[0x2C] = Instruction(
+            "BIT {:04X}", self.bit, self._mode_abs, 4, 0x2C
+        )
+
+    def bit(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        self.p_zero = 1 if (self.a & value) == 0 else 0
+        self.p_sign = (value >> 7) & 0x1
+        self.p_overflow = (value >> 6) & 0x1
+        return False
 
     def cpy(self, address: U16) -> bool:
         value: U8 = self.bus.read(address)

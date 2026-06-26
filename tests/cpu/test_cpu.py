@@ -667,3 +667,25 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(0x1, self.cpu.p_sign)
         self.assertEqual(0x0, self.cpu.p_zero)
         self.assertEqual(0x0, self.cpu.p_carry)
+
+    def test_bit_zp_zero(self) -> None:
+        self.cpu.a = 0x0
+        self.write_bytes(START_PC, [0x24, 0x02])
+        self.write_bytes(0x0002, [0x0])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x1, self.cpu.p_zero)
+        self.assertEqual(0x0, self.cpu.p_sign)
+        self.assertEqual(0x0, self.cpu.p_overflow)
+
+    def test_bit_abs_sign_overflow(self) -> None:
+        self.cpu.a = 0b11000000
+        self.write_bytes(START_PC, [0x2C, 0x02, 0x01])
+        self.write_bytes(0x0102, [0b11000000])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x0, self.cpu.p_zero)
+        self.assertEqual(0x1, self.cpu.p_sign)
+        self.assertEqual(0x1, self.cpu.p_overflow)
