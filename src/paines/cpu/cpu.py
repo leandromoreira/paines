@@ -529,6 +529,130 @@ class CPU6502:
         self.instruction_set[0xDE] = Instruction(
             "DEC {:04X}, X", self.dec, self._mode_abs_x, 7, 0xDE
         )
+        self.instruction_set[0x0A] = Instruction(
+            "ASL A", self.asl_acc, self._mode_implied, 2, 0x0A
+        )
+        self.instruction_set[0x06] = Instruction(
+            "ASL {:02X}", self.asl, self._mode_zp, 5, 0x06
+        )
+        self.instruction_set[0x16] = Instruction(
+            "ASL {:02X}, X", self.asl, self._mode_zp_x, 6, 0x16
+        )
+        self.instruction_set[0x0E] = Instruction(
+            "ASL {:04X}", self.asl, self._mode_abs, 6, 0x0E
+        )
+        self.instruction_set[0x1E] = Instruction(
+            "ASL {:04X}, X", self.asl, self._mode_abs_x, 7, 0x1E
+        )
+        self.instruction_set[0x4A] = Instruction(
+            "LSR A", self.lsr_acc, self._mode_implied, 2, 0x4A
+        )
+        self.instruction_set[0x46] = Instruction(
+            "LSR {:02X}", self.lsr, self._mode_zp, 5, 0x46
+        )
+        self.instruction_set[0x56] = Instruction(
+            "LSR {:02X}, X", self.lsr, self._mode_zp_x, 6, 0x56
+        )
+        self.instruction_set[0x4E] = Instruction(
+            "LSR {:04X}", self.lsr, self._mode_abs, 6, 0x4E
+        )
+        self.instruction_set[0x5E] = Instruction(
+            "LSR {:04X}, X", self.lsr, self._mode_abs_x, 7, 0x5E
+        )
+        self.instruction_set[0x2A] = Instruction(
+            "ROL A", self.rol_acc, self._mode_implied, 2, 0x2A
+        )
+        self.instruction_set[0x26] = Instruction(
+            "ROL {:02X}", self.rol, self._mode_zp, 5, 0x26
+        )
+        self.instruction_set[0x36] = Instruction(
+            "ROL {:02X}, X", self.rol, self._mode_zp_x, 6, 0x36
+        )
+        self.instruction_set[0x2E] = Instruction(
+            "ROL {:04X}", self.rol, self._mode_abs, 6, 0x2E
+        )
+        self.instruction_set[0x3E] = Instruction(
+            "ROL {:04X}, X", self.rol, self._mode_abs_x, 7, 0x3E
+        )
+        self.instruction_set[0x6A] = Instruction(
+            "ROR A", self.ror_acc, self._mode_implied, 2, 0x6A
+        )
+        self.instruction_set[0x66] = Instruction(
+            "ROR {:02X}", self.ror, self._mode_zp, 5, 0x66
+        )
+        self.instruction_set[0x76] = Instruction(
+            "ROR {:02X}, X", self.ror, self._mode_zp_x, 6, 0x76
+        )
+        self.instruction_set[0x6E] = Instruction(
+            "ROR {:04X}", self.ror, self._mode_abs, 6, 0x6E
+        )
+        self.instruction_set[0x7E] = Instruction(
+            "ROR {:04X}, X", self.ror, self._mode_abs_x, 7, 0x7E
+        )
+
+    def lsr_acc(self, _: U16) -> bool:
+        self.p_carry = self.a & 0x1
+        new_value = self.a >> 1
+        self.a = new_value
+        self.check_nz(new_value)
+        return False
+
+    def rol_acc(self, _: U16) -> bool:
+        old_carry = self.p_carry
+        self.p_carry = (self.a >> 7) & 0x1
+        new_value = ((self.a << 1) | old_carry) & 0xFF
+        self.a = new_value
+        self.check_nz(new_value)
+        return False
+
+    def ror_acc(self, _: U16) -> bool:
+        old_carry = self.p_carry
+        self.p_carry = self.a & 0x1
+        new_value = (self.a >> 1) | (old_carry << 7)
+        self.a = new_value
+        self.check_nz(new_value)
+        return False
+
+    def asl_acc(self, _: U16) -> bool:
+        self.p_carry = (self.a >> 7) & 0x1
+        new_value = (self.a << 1) & 0xFF
+        self.a = new_value
+        self.check_nz(new_value)
+        return False
+
+    def asl(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        self.p_carry = (value >> 7) & 0x1
+        new_value = (value << 1) & 0xFF
+        self.bus.write(address, new_value)
+        self.check_nz(new_value)
+        return False
+
+    def lsr(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        self.p_carry = value & 0x1
+        new_value = value >> 1
+        self.bus.write(address, new_value)
+        self.check_nz(new_value)
+        return False
+
+    def rol(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        old_carry = self.p_carry
+        self.p_carry = (value >> 7) & 0x1
+        new_value = ((value << 1) | old_carry) & 0xFF
+        self.bus.write(address, new_value)
+        self.check_nz(new_value)
+        return False
+
+    def ror(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        old_carry = self.p_carry
+        self.p_carry = value & 0x1
+        new_value = (value >> 1) | (old_carry << 7)
+        self.bus.write(address, new_value)
+        self.check_nz(new_value)
+        return False
 
     def dec(self, address: U16) -> bool:
         value: U8 = self.bus.read(address)

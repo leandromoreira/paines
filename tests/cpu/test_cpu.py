@@ -735,3 +735,60 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(0x00, self.cpu.bus.read(0x02))
         self.assertEqual(1, self.cpu.p_zero)
         self.assertEqual(0, self.cpu.p_sign)
+
+    def test_asl_memory(self) -> None:
+        self.write_bytes(START_PC, [0x06, 0x02])
+        self.write_bytes(0x02, [0x81])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x02, self.cpu.bus.read(0x02))
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_zero)
+        self.assertEqual(0, self.cpu.p_sign)
+
+    def test_lsr_memory(self) -> None:
+        self.write_bytes(START_PC, [0x46, 0x02])
+        self.write_bytes(0x02, [0x03])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x01, self.cpu.bus.read(0x02))
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_zero)
+        self.assertEqual(0, self.cpu.p_sign)
+
+    def test_rol_memory(self) -> None:
+        self.cpu.p_carry = 1
+        self.write_bytes(START_PC, [0x26, 0x02])
+        self.write_bytes(0x02, [0x80])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x01, self.cpu.bus.read(0x02))
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_zero)
+        self.assertEqual(0, self.cpu.p_sign)
+
+    def test_ror_memory_to_negative(self) -> None:
+        self.cpu.p_carry = 1
+        self.write_bytes(START_PC, [0x66, 0x02])
+        self.write_bytes(0x02, [0x02])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x81, self.cpu.bus.read(0x02))
+        self.assertEqual(0, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_zero)
+        self.assertEqual(1, self.cpu.p_sign)
+
+    def test_lsr_to_zero(self) -> None:
+        self.write_bytes(START_PC, [0x46, 0x02])
+        self.write_bytes(0x02, [0x01])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x00, self.cpu.bus.read(0x02))
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(1, self.cpu.p_zero)
+        self.assertEqual(0, self.cpu.p_sign)
