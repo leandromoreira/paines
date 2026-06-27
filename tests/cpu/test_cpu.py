@@ -804,3 +804,49 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(1, self.cpu.p_carry)
         self.assertEqual(1, self.cpu.p_zero)
         self.assertEqual(0, self.cpu.p_sign)
+
+    def test_asl_accumulator(self) -> None:
+        self.cpu.a = 0b10001011
+        self.write_bytes(START_PC, [0x0A])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x16, self.cpu.a)
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_zero)
+        self.assertEqual(0, self.cpu.p_sign)
+
+    def test_lsr_accumulator_to_zero(self) -> None:
+        self.cpu.a = 0b00000001
+        self.write_bytes(START_PC, [0x4A])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x00, self.cpu.a)
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(1, self.cpu.p_zero)
+        self.assertEqual(0, self.cpu.p_sign)
+
+    def test_rol_accumulator_with_carry(self) -> None:
+        self.cpu.a = 0b10000010
+        self.cpu.p_carry = 1
+        self.write_bytes(START_PC, [0x2A])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x05, self.cpu.a)
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_zero)
+        self.assertEqual(0, self.cpu.p_sign)
+
+    def test_ror_accumulator_sets_sign_flag(self) -> None:
+        self.cpu.a = 0b01000100
+        self.cpu.p_carry = 1
+        self.write_bytes(START_PC, [0x6A])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xA2, self.cpu.a)
+        self.assertEqual(0, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_zero)
+        self.assertEqual(1, self.cpu.p_sign)
