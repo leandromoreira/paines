@@ -689,3 +689,49 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(0x0, self.cpu.p_zero)
         self.assertEqual(0x1, self.cpu.p_sign)
         self.assertEqual(0x1, self.cpu.p_overflow)
+
+    def test_inc_zp(self) -> None:
+        self.write_bytes(START_PC, [0xE6, 0x02])
+        self.write_bytes(0x02, [0x9])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xA, self.cpu.bus.read(0x02))
+
+    def test_inc_zp_wrap(self) -> None:
+        self.write_bytes(START_PC, [0xE6, 0x02])
+        self.write_bytes(0x02, [0xFF])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x0, self.cpu.bus.read(0x02))
+        self.assertEqual(0x1, self.cpu.p_zero)
+        self.assertEqual(0x0, self.cpu.p_sign)
+
+    def test_dec_zp(self) -> None:
+        self.write_bytes(START_PC, [0xC6, 0x02])
+        self.write_bytes(0x02, [0x0A])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x09, self.cpu.bus.read(0x02))
+
+    def test_dec_zp_wrap(self) -> None:
+        self.write_bytes(START_PC, [0xC6, 0x02])
+        self.write_bytes(0x02, [0x00])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xFF, self.cpu.bus.read(0x02))
+        self.assertEqual(0, self.cpu.p_zero)
+        self.assertEqual(1, self.cpu.p_sign)
+
+    def test_dec_zp_to_zero(self) -> None:
+        self.write_bytes(START_PC, [0xC6, 0x02])
+        self.write_bytes(0x02, [0x01])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x00, self.cpu.bus.read(0x02))
+        self.assertEqual(1, self.cpu.p_zero)
+        self.assertEqual(0, self.cpu.p_sign)

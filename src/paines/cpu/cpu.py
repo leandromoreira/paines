@@ -505,6 +505,44 @@ class CPU6502:
         self.instruction_set[0x2C] = Instruction(
             "BIT {:04X}", self.bit, self._mode_abs, 4, 0x2C
         )
+        self.instruction_set[0xE6] = Instruction(
+            "INC {:02X}", self.inc, self._mode_zp, 5, 0xE6
+        )
+        self.instruction_set[0xF6] = Instruction(
+            "INC {:02X}, X", self.inc, self._mode_zp_x, 6, 0xF6
+        )
+        self.instruction_set[0xEE] = Instruction(
+            "INC {:04X}", self.inc, self._mode_abs, 6, 0xEE
+        )
+        self.instruction_set[0xFE] = Instruction(
+            "INC {:04X}, X", self.inc, self._mode_abs_x, 7, 0xFE
+        )
+        self.instruction_set[0xC6] = Instruction(
+            "DEC {:02X}", self.dec, self._mode_zp, 5, 0xC6
+        )
+        self.instruction_set[0xD6] = Instruction(
+            "DEC {:02X}, X", self.dec, self._mode_zp_x, 6, 0xD6
+        )
+        self.instruction_set[0xCE] = Instruction(
+            "DEC {:04X}", self.dec, self._mode_abs, 6, 0xCE
+        )
+        self.instruction_set[0xDE] = Instruction(
+            "DEC {:04X}, X", self.dec, self._mode_abs_x, 7, 0xDE
+        )
+
+    def dec(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        new_value: U8 = (value - 1) & 0xFF
+        self.bus.write(address, new_value)
+        self.check_nz(new_value)
+        return False
+
+    def inc(self, address: U16) -> bool:
+        value: U8 = self.bus.read(address)
+        new_value: U8 = (value + 1) & 0xFF
+        self.bus.write(address, new_value)
+        self.check_nz(new_value)
+        return False
 
     def bit(self, address: U16) -> bool:
         value: U8 = self.bus.read(address)
