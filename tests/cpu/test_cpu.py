@@ -420,14 +420,26 @@ class Test6502Instructions(unittest.TestCase):
 
         self.assertEqual(self.cpu.a, self.cpu.bus.read(0x0100 | (self.cpu.s + 1)))
 
-    def test_php(self) -> None:
-        self.cpu.p = 0b1000100
-        self.write_bytes(START_PC, [0x08])
-        self.write_bytes(0x01FC, [0xEA])
+    def test_php_forces_bits_high(self) -> None:
+        self.cpu.p_sign = 1
+        self.cpu.p_carry = 0
+        self.cpu.p_zero = 0
+        self.cpu.p_overflow = 0
 
+        self.cpu.compose_p()
+
+        self.write_bytes(START_PC, [0x08])
+
+        initial_stack_pointer = self.cpu.s
         self.cpu.execute()
 
-        self.assertEqual(self.cpu.p, self.cpu.bus.read(0x0100 | (self.cpu.s + 1)))
+        written_stack_address = 0x0100 | ((initial_stack_pointer) & 0xFF)
+        pushed_value = self.cpu.bus.read(written_stack_address)
+
+        self.assertEqual(initial_stack_pointer - 1, self.cpu.s)
+
+        expected_pushed_value = self.cpu.p | 0x30
+        self.assertEqual(expected_pushed_value, pushed_value)
 
     def test_pla(self) -> None:
         self.cpu.s = 0xAB

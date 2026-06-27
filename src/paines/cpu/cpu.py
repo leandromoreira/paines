@@ -765,7 +765,8 @@ class CPU6502:
         return False
 
     def php(self, _: U16) -> bool:
-        self.bus.write(0x0100 | self.s, self.p)
+        self.compose_p()
+        self.bus.write(0x0100 | self.s, self.p | 0x30)
         self.s = (self.s - 1) & 0xFF
         return False
 
