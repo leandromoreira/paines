@@ -850,3 +850,81 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(0, self.cpu.p_carry)
         self.assertEqual(0, self.cpu.p_zero)
         self.assertEqual(1, self.cpu.p_sign)
+
+    def test_jmp(self) -> None:
+        self.write_bytes(START_PC, [0x4C, 0xDC, 0xAC])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xACDC, self.cpu.pc)
+
+    def test_jmp_ind(self) -> None:
+        self.write_bytes(START_PC, [0x6C, 0xDC, 0x0C])
+        self.write_bytes(0x0CDC, [0xDE, 0xDE])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xDEDE, self.cpu.pc)
+
+    def test_jmp_ind_cross(self) -> None:
+        self.write_bytes(START_PC, [0x6C, 0xFF, 0x0C])
+        self.write_bytes(0x0CFF, [0xDE, 0xDE])
+        self.write_bytes(0x0C00, [0xAA])
+
+        self.cpu.execute()
+
+        self.assertEqual(0xAADE, self.cpu.pc)
+
+    def test_jsr(self) -> None:
+        initial_pc = 0x0FFF
+        self.cpu.pc = initial_pc
+        self.cpu.s = 0xFF
+
+        self.write_bytes(initial_pc, [0x20, 0x00, 0x02])
+
+        self.cpu.execute()
+
+        expected_high = 0x10
+        expected_low = 0x01
+
+        self.assertEqual(0x0200, self.cpu.pc)
+        self.assertEqual(0xFD, self.cpu.s)
+
+        self.assertEqual(expected_high, self.cpu.bus.read(0x01FF))
+        self.assertEqual(expected_low, self.cpu.bus.read(0x01FE))
+
+    def test_rts_restores_pc_plus_one(self) -> None:
+        self.cpu.s = 0xFF
+
+        self.cpu.bus.write(0x01FF, 0x10)
+        self.cpu.bus.write(0x01FE, 0x01)
+
+        self.cpu.s = 0xFD
+
+        self.write_bytes(START_PC, [0x60])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x1002, self.cpu.pc)
+        self.assertEqual(0xFF, self.cpu.s)
+
+    def test_rti_restores_flags_and_exact_pc(self) -> None:
+        self.cpu.s = 0xFF
+        self.cpu.bus.write(0x01FF, 0x20)
+        self.cpu.bus.write(0x01FE, 0x50)
+        status_payload = 0b11000001
+        self.cpu.bus.write(0x01FD, status_payload)
+        self.cpu.s = 0xFC
+        self.cpu.p_brk = 1
+        self.write_bytes(START_PC, [0x40])
+
+        self.cpu.execute()
+
+        self.assertEqual(0x2050, self.cpu.pc)
+        self.assertEqual(0xFF, self.cpu.s)
+        self.assertEqual(1, self.cpu.p_sign)
+        self.assertEqual(1, self.cpu.p_overflow)
+        self.assertEqual(1, self.cpu.p_carry)
+        self.assertEqual(0, self.cpu.p_zero)
+        self.assertEqual(0, self.cpu.p_irq)
+        self.assertEqual(1, self.cpu.p_brk)

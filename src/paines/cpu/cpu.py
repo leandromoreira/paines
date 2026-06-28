@@ -589,6 +589,86 @@ class CPU6502:
         self.instruction_set[0x7E] = Instruction(
             "ROR {:04X}, X", self.ror, self._mode_abs_x, 7, 0x7E
         )
+        self.instruction_set[0x4C] = Instruction(
+            "JMP {:04X}", self.jmp, self._mode_abs, 3, 0x4C
+        )
+        self.instruction_set[0x6C] = Instruction(
+            "JMP ({:04X})", self.jmp_i, self._mode_abs, 5, 0x6C
+        )
+        self.instruction_set[0x20] = Instruction(
+            "JSR {:04X}", self.jsr, self._mode_abs, 6, 0x20
+        )
+        self.instruction_set[0x60] = Instruction(
+            "RTS", self.rts, self._mode_implied, 6, 0x60
+        )
+        self.instruction_set[0x40] = Instruction(
+            "RTI", self.rti, self._mode_implied, 6, 0x40
+        )
+
+    def rti(self, _: U16) -> bool:
+        self.s = (self.s + 1) & 0xFF
+        status_byte = self.bus.read(0x0100 | self.s)
+
+        self.p_carry = status_byte & 0x01
+        self.p_zero = (status_byte >> 1) & 0x01
+        self.p_irq = (status_byte >> 2) & 0x01
+        self.p_dcm = (status_byte >> 3) & 0x01
+        self.p_unused = (status_byte >> 5) & 0x01
+        self.p_overflow = (status_byte >> 6) & 0x01
+        self.p_sign = (status_byte >> 7) & 0x01
+
+        self.s = (self.s + 1) & 0xFF
+        low = self.bus.read(0x0100 | self.s)
+
+        self.s = (self.s + 1) & 0xFF
+        high = self.bus.read(0x0100 | self.s)
+
+        self.pc = (high << 8) | low
+
+        return False
+
+    def rts(self, _: U16) -> bool:
+        self.s = (self.s + 1) & 0xFF
+        low = self.bus.read(0x0100 | self.s)
+
+        self.s = (self.s + 1) & 0xFF
+        high = self.bus.read(0x0100 | self.s)
+
+        return_address = (high << 8) | low
+        self.pc = (return_address + 1) & 0xFFFF
+
+        return False
+
+    def jsr(self, address: U16) -> bool:
+        return_address: U16 = (self.pc - 1) & 0xFFFF
+
+        high: U8 = (return_address >> 8) & 0xFF
+        low: U8 = return_address & 0xFF
+
+        self.bus.write(0x0100 | self.s, high)
+        self.s = (self.s - 1) & 0xFF
+
+        self.bus.write(0x0100 | self.s, low)
+        self.s = (self.s - 1) & 0xFF
+
+        self.pc = address
+        return False
+
+    def jmp_i(self, address: U16) -> bool:
+        low = address
+        high: U16 = (address + 1) & 0xFFFF
+        if (address & 0x00FF) == 0x00FF:
+            high = address & 0xFF00
+
+        target_low = self.bus.read(low)
+        target_high = self.bus.read(high)
+
+        self.pc = (target_high << 8) | target_low
+        return False
+
+    def jmp(self, address: U16) -> bool:
+        self.pc = address
+        return False
 
     def lsr_acc(self, _: U16) -> bool:
         self.p_carry = self.a & 0x1
