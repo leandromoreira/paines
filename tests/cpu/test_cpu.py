@@ -928,3 +928,37 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(0, self.cpu.p_zero)
         self.assertEqual(0, self.cpu.p_irq)
         self.assertEqual(1, self.cpu.p_brk)
+
+    def test_bpl_backward_cross_page(self) -> None:
+        backward_steps: U8 = -4
+        self.write_bytes(START_PC, [0x10, (backward_steps & 0xFF)])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(START_PC - 2, self.cpu.pc)
+        self.assertEqual(4, cycles)
+
+    def test_bpl_backward_same_page(self) -> None:
+        safe_start_pc = 0x1010
+        self.cpu.pc = safe_start_pc
+
+        backward_steps = -4
+        self.write_bytes(safe_start_pc, [0x10, (backward_steps & 0xFF)])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(0x100E, self.cpu.pc)
+        self.assertEqual(3, cycles)
+
+    def test_bpl_backward_no_branch(self) -> None:
+        self.cpu.p_sign = 1
+        safe_start_pc = 0x1010
+        self.cpu.pc = safe_start_pc
+
+        backward_steps = -4
+        self.write_bytes(safe_start_pc, [0x10, (backward_steps & 0xFF)])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(safe_start_pc + 2, self.cpu.pc)
+        self.assertEqual(2, cycles)

@@ -6,30 +6,62 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  pull-requests: write
+  contents: read
+
 jobs:
-  test:
-    name: Run Tests
+  # Job 1: Quick Linting, Formatting, and Type Checking
+  lint:
+    name: Code Quality
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Check out your repository code
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # 2. Install uv and set up Python with caching enabled
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
-          # Automatically cache dependencies for faster subsequent runs
           enable-cache: true
-          # Specify the Python version (or omit to use your .python-version file)
           python-version: "3.12"
 
-      # 3. Install dependencies from uv.lock
+      - name: Check Formatting (Ruff)
+        run: uvx ruff format --check .
+
+      - name: Lint & Type Annotations (Ruff)
+        run: uvx ruff check . --select ANN
+
+  # Job 2: Run Test Suite and generate Coverage
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    # This job can run in parallel, but it's good practice to keep them independent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
       - name: Install dependencies
         run: uv sync --frozen
 
-      # 4. Run your tests or scripts using uv run
       - name: Run Pytest
-        run: uv run pytest
+        run: |
+          uv run --with pytest-cov pytest -s --cov=src/ --junitxml=pytest.xml --cov-report=term-missing | tee pytest-coverage.txt
 
+      - name: Post Pytest Coverage Comment
+        uses: MishaKav/pytest-coverage-comment@v1
+        with:
+          pytest-coverage-path: ./pytest-coverage.txt
+          junitxml-path: ./pytest.xml
+
+      # Bonus: Save coverage report as an artifact accessible from the GitHub UI
+      - name: Upload Coverage Report Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-coverage-report
+          path: |
+            pytest-coverage.txt
+            pytest.xml

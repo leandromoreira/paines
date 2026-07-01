@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Any
 
 from paines.bus.bus import CPUBus, cpu_bus_builder
 from paines.types import U16, U8
@@ -8,16 +8,18 @@ class Instruction:
     def __init__(
         self,
         name: str,
-        execute: Callable[[U8], bool],
+        execute: Callable[[U8], Any],
         mode: Callable[[], tuple[U16, bool]],
         cycles: U8,
         op_code: U8,
+        is_branch: bool = False,
     ) -> None:
         self.name = name
         self.execute = execute
         self.mode = mode
         self.cycles = cycles
         self.op_code = op_code
+        self.is_branch = is_branch
 
 
 class DebugTrace:
@@ -135,6 +137,14 @@ class CPU6502:
         page_crossed = (final & 0xFF00) != (base & 0xFF00)
         return final, page_crossed
 
+    def _mode_rel(self) -> tuple[U16, bool]:
+        offset = self.bus.read(self.pc)
+        self.pc += 1
+        signed_offset = offset - 256 if offset >= 0x80 else offset
+        destination: U16 = (self.pc + signed_offset) & 0xFFFF
+        actual_page_crossed = (destination & 0xFF00) != (self.pc & 0xFF00)
+        return destination, actual_page_crossed
+
     def execute(self) -> U8:
         cycles: U8 = 0
         initial_address: U16 = self.pc
@@ -151,9 +161,21 @@ class CPU6502:
         if self.debug:
             self.perform_debug(instruction, op_code, initial_address, operand_address)
 
-        allows_page_penalty = instruction.execute(addr)
+        allows_page_penalty: bool = False
+        has_branched: bool = False
+
+        if instruction.is_branch:
+            allows_page_penalty, has_branched = instruction.execute(addr)
+        else:
+            allows_page_penalty = instruction.execute(addr)
+
         cycles += instruction.cycles
-        if allows_page_penalty and page_crossed:
+
+        if has_branched:
+            cycles += 1
+            if allows_page_penalty and page_crossed:
+                cycles += 1
+        elif allows_page_penalty and page_crossed:
             cycles += 1
 
         self.total_cycle += cycles
@@ -186,7 +208,13 @@ class CPU6502:
         self, memory_slice: list[DebugTrace], instruction: Instruction
     ) -> None:
         asm_trace = instruction.name
-        if len(memory_slice) == 2:
+
+        if instruction.is_branch:
+            raw_operand = memory_slice[1].value
+            raw_operand = raw_operand - 256 if raw_operand >= 0x80 else raw_operand
+            current_pc = memory_slice[1].address
+            asm_trace = instruction.name.format(current_pc + 1 + raw_operand)
+        elif len(memory_slice) == 2:
             raw_operand = memory_slice[1].value
             asm_trace = instruction.name.format(raw_operand)
         elif len(memory_slice) == 3:
@@ -604,6 +632,15 @@ class CPU6502:
         self.instruction_set[0x40] = Instruction(
             "RTI", self.rti, self._mode_implied, 6, 0x40
         )
+        self.instruction_set[0x10] = Instruction(
+            "BPL {:04X}", self.bpl, self._mode_rel, 2, 0x10, is_branch=True
+        )
+
+    def bpl(self, address: U16) -> tuple[bool, bool]:
+        if self.p_sign == 0:
+            self.pc = address
+            return (True, True)
+        return (False, False)
 
     def rti(self, _: U16) -> bool:
         self.s = (self.s + 1) & 0xFF
