@@ -9,6 +9,7 @@ on:
 permissions:
   pull-requests: write
   contents: read
+  statuses: write
 
 jobs:
   # Job 1: Quick Linting, Formatting, and Type Checking
@@ -53,6 +54,7 @@ jobs:
 
       - name: Post Pytest Coverage Comment
         uses: MishaKav/pytest-coverage-comment@v1
+        if: github.event_name == 'pull_request'
         with:
           pytest-coverage-path: ./pytest-coverage.txt
           junitxml-path: ./pytest.xml
