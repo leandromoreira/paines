@@ -635,6 +635,69 @@ class CPU6502:
         self.instruction_set[0x10] = Instruction(
             "BPL {:04X}", self.bpl, self._mode_rel, 2, 0x10, is_branch=True
         )
+        self.instruction_set[0x30] = Instruction(
+            "BMI {:04X}", self.bmi, self._mode_rel, 2, 0x30, is_branch=True
+        )
+        self.instruction_set[0x50] = Instruction(
+            "BVC {:04X}", self.bvc, self._mode_rel, 2, 0x50, is_branch=True
+        )
+        self.instruction_set[0x70] = Instruction(
+            "BVS {:04X}", self.bvs, self._mode_rel, 2, 0x70, is_branch=True
+        )
+        self.instruction_set[0x90] = Instruction(
+            "BCC {:04X}", self.bcc, self._mode_rel, 2, 0x90, is_branch=True
+        )
+        self.instruction_set[0xB0] = Instruction(
+            "BCS {:04X}", self.bcs, self._mode_rel, 2, 0xB0, is_branch=True
+        )
+        self.instruction_set[0xD0] = Instruction(
+            "BNE {:04X}", self.bne, self._mode_rel, 2, 0xD0, is_branch=True
+        )
+        self.instruction_set[0xF0] = Instruction(
+            "BEQ {:04X}", self.beq, self._mode_rel, 2, 0xF0, is_branch=True
+        )
+
+    def beq(self, address: U16) -> tuple[bool, bool]:
+        if self.p_zero == 1:
+            self.pc = address
+            return (True, True)
+        return (False, False)
+
+    def bne(self, address: U16) -> tuple[bool, bool]:
+        if self.p_zero == 0:
+            self.pc = address
+            return (True, True)
+        return (False, False)
+
+    def bcs(self, address: U16) -> tuple[bool, bool]:
+        if self.p_carry == 1:
+            self.pc = address
+            return (True, True)
+        return (False, False)
+
+    def bcc(self, address: U16) -> tuple[bool, bool]:
+        if self.p_carry == 0:
+            self.pc = address
+            return (True, True)
+        return (False, False)
+
+    def bvs(self, address: U16) -> tuple[bool, bool]:
+        if self.p_overflow == 1:
+            self.pc = address
+            return (True, True)
+        return (False, False)
+
+    def bvc(self, address: U16) -> tuple[bool, bool]:
+        if self.p_overflow == 0:
+            self.pc = address
+            return (True, True)
+        return (False, False)
+
+    def bmi(self, address: U16) -> tuple[bool, bool]:
+        if self.p_sign == 1:
+            self.pc = address
+            return (True, True)
+        return (False, False)
 
     def bpl(self, address: U16) -> tuple[bool, bool]:
         if self.p_sign == 0:

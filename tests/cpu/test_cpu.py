@@ -962,3 +962,94 @@ class Test6502Instructions(unittest.TestCase):
 
         self.assertEqual(safe_start_pc + 2, self.cpu.pc)
         self.assertEqual(2, cycles)
+
+    def test_bmi(self) -> None:
+        safe_start_pc = 0x1010
+        self.cpu.pc = safe_start_pc
+        self.cpu.p_sign = 0x1
+
+        backward_steps = -4
+        self.write_bytes(safe_start_pc, [0x30, (backward_steps & 0xFF)])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(0x100E, self.cpu.pc)
+        self.assertEqual(3, cycles)
+
+    def test_bvs(self) -> None:
+        safe_start_pc = 0x1010
+        self.cpu.pc = safe_start_pc
+        self.cpu.p_overflow = 0x1
+
+        backward_steps = -4
+        self.write_bytes(safe_start_pc, [0x70, (backward_steps & 0xFF)])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(0x100E, self.cpu.pc)
+        self.assertEqual(3, cycles)
+
+    def test_bvc(self) -> None:
+        safe_start_pc = 0x1010
+        self.cpu.pc = safe_start_pc
+        self.cpu.p_overflow = 0x0
+
+        backward_steps = -4
+        self.write_bytes(safe_start_pc, [0x50, (backward_steps & 0xFF)])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(0x100E, self.cpu.pc)
+        self.assertEqual(3, cycles)
+
+    def test_bcc(self) -> None:
+        safe_start_pc = 0x1010
+        self.cpu.pc = safe_start_pc
+        self.cpu.p_carry = 0x0
+
+        backward_steps = -4
+        self.write_bytes(safe_start_pc, [0x90, (backward_steps & 0xFF)])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(0x100E, self.cpu.pc)
+        self.assertEqual(3, cycles)
+
+    def test_bcs(self) -> None:
+        safe_start_pc = 0x1010
+        self.cpu.pc = safe_start_pc
+        self.cpu.p_carry = 0x1
+
+        backward_steps = -4
+        self.write_bytes(safe_start_pc, [0xB0, (backward_steps & 0xFF)])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(0x100E, self.cpu.pc)
+        self.assertEqual(3, cycles)
+
+    def test_bne(self) -> None:
+        safe_start_pc = 0x1010
+        self.cpu.pc = safe_start_pc
+        self.cpu.p_zero = 0x0
+
+        backward_steps = -4
+        self.write_bytes(safe_start_pc, [0xD0, (backward_steps & 0xFF)])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(0x100E, self.cpu.pc)
+        self.assertEqual(3, cycles)
+
+    def test_beq(self) -> None:
+        safe_start_pc = 0x1010
+        self.cpu.pc = safe_start_pc
+        self.cpu.p_zero = 0x1
+
+        backward_steps = -4
+        self.write_bytes(safe_start_pc, [0xF0, (backward_steps & 0xFF)])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(0x100E, self.cpu.pc)
+        self.assertEqual(3, cycles)
