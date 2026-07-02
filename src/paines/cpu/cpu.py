@@ -706,6 +706,12 @@ class CPU6502:
         self.instruction_set[0x00] = Instruction(
             "BRK", self.brk, self._mode_implied, 7, 0x00
         )
+        self.instruction_set[0xEA] = Instruction(
+            "NOP", self.nop, self._mode_implied, 2, 0xEA
+        )
+
+    def nop(self, _: U16) -> bool:
+        return False
 
     def brk(self, _: U16) -> bool:
         return_address: U16 = (self.pc + 1) & 0xFFFF

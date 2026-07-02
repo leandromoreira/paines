@@ -1149,3 +1149,10 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(0x0, self.cpu.p_brk)
         self.assertEqual(0x1, self.cpu.p_irq)
         self.assertEqual(7, cycles)
+
+    def test_nop(self) -> None:
+        self.write_bytes(START_PC, [0xEA])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(2, cycles)
