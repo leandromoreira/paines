@@ -656,6 +656,32 @@ class CPU6502:
         self.instruction_set[0xF0] = Instruction(
             "BEQ {:04X}", self.beq, self._mode_rel, 2, 0xF0, is_branch=True
         )
+        self.instruction_set[0x00] = Instruction(
+            "BRK", self.brk, self._mode_implied, 7, 0x00
+        )
+
+    def brk(self, _: U16) -> bool:
+        return_address: U16 = (self.pc + 1) & 0xFFFF
+        high_pc: U8 = (return_address >> 8) & 0xFF
+        low_pc: U8 = return_address & 0xFF
+
+        self.bus.write(0x0100 | self.s, high_pc)
+        self.s = (self.s - 1) & 0xFF
+
+        self.bus.write(0x0100 | self.s, low_pc)
+        self.s = (self.s - 1) & 0xFF
+
+        self.compose_p()
+        pushed_status: U8 = self.p | 0x10 | 0x20
+        self.bus.write(0x0100 | self.s, pushed_status)
+        self.s = (self.s - 1) & 0xFF
+
+        low_vector: U8 = self.bus.read(0xFFFE)
+        high_vector: U8 = self.bus.read(0xFFFF)
+        self.pc = (high_vector << 8) | low_vector
+        self.p_irq = 0x1
+
+        return False
 
     def beq(self, address: U16) -> tuple[bool, bool]:
         if self.p_zero == 1:
@@ -713,7 +739,8 @@ class CPU6502:
         self.p_zero = (status_byte >> 1) & 0x01
         self.p_irq = (status_byte >> 2) & 0x01
         self.p_dcm = (status_byte >> 3) & 0x01
-        self.p_unused = (status_byte >> 5) & 0x01
+        self.p_unused = 0x1
+        self.p_brk = 0x0
         self.p_overflow = (status_byte >> 6) & 0x01
         self.p_sign = (status_byte >> 7) & 0x01
 

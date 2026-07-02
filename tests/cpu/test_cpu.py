@@ -915,7 +915,6 @@ class Test6502Instructions(unittest.TestCase):
         status_payload = 0b11000001
         self.cpu.bus.write(0x01FD, status_payload)
         self.cpu.s = 0xFC
-        self.cpu.p_brk = 1
         self.write_bytes(START_PC, [0x40])
 
         self.cpu.execute()
@@ -927,7 +926,6 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(1, self.cpu.p_carry)
         self.assertEqual(0, self.cpu.p_zero)
         self.assertEqual(0, self.cpu.p_irq)
-        self.assertEqual(1, self.cpu.p_brk)
 
     def test_bpl_backward_cross_page(self) -> None:
         backward_steps: U8 = -4
@@ -1053,3 +1051,18 @@ class Test6502Instructions(unittest.TestCase):
 
         self.assertEqual(0x100E, self.cpu.pc)
         self.assertEqual(3, cycles)
+
+    def test_brk(self) -> None:
+        self.cpu.p_irq = 0x0
+        zelda = Cartridge()
+        zelda.load(f"{CARTRIDGE_PATH}zelda/Zelda.NES")
+        self.cpu.bus.cartridge = zelda
+        padding = 0xA1
+        self.write_bytes(START_PC, [0x00, padding])
+
+        cycles = self.cpu.execute()
+
+        self.assertEqual(0xC62A, self.cpu.pc)
+        self.assertEqual(0x0, self.cpu.p_brk)
+        self.assertEqual(0x1, self.cpu.p_irq)
+        self.assertEqual(7, cycles)
