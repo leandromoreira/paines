@@ -33,6 +33,89 @@ class Test6502Instructions(unittest.TestCase):
         self.assertEqual(cycles, 7)
         self.assertEqual(self.cpu.s, 0xFD)
 
+    def test_nmi_execution(self) -> None:
+        zelda = Cartridge()
+        zelda.load(f"{CARTRIDGE_PATH}zelda/Zelda.NES")
+
+        self.cpu.bus.cartridge = zelda
+        current_pc = 0x1234
+        self.cpu.pc = current_pc
+        self.cpu.s = 0xFF
+        self.cpu.p_irq = 0x0
+        self.cpu.p_sign = 0x1
+        self.cpu.compose_p()
+
+        self.cpu.bus.write(0xFFFA, 0x78)
+        self.cpu.bus.write(0xFFFB, 0x56)
+
+        cycles = self.cpu.nmi()
+
+        self.assertEqual(0x5678, self.cpu.pc)
+        self.assertEqual(7, cycles)
+        self.assertEqual(0x1, self.cpu.p_irq)
+
+        self.assertEqual(0xFC, self.cpu.s)
+
+        self.assertEqual(0x12, self.cpu.bus.read(0x01FF))
+        self.assertEqual(0x34, self.cpu.bus.read(0x01FE))
+
+        pushed_status = self.cpu.bus.read(0x01FD)
+        self.assertEqual(0, (pushed_status >> 4) & 1)
+        self.assertEqual(1, (pushed_status >> 5) & 1)
+
+    def test_irq_executed_when_allowed(self) -> None:
+        zelda = Cartridge()
+        zelda.load(f"{CARTRIDGE_PATH}zelda/Zelda.NES")
+
+        self.cpu.bus.cartridge = zelda
+        current_pc = 0xABCD
+        self.cpu.pc = current_pc
+        self.cpu.s = 0x80
+        self.cpu.p_irq = 0x0
+        self.cpu.compose_p()
+
+        self.cpu.bus.write(0xFFFE, 0x34)
+        self.cpu.bus.write(0xFFFF, 0x12)
+
+        cycles = self.cpu.irq()
+
+        self.assertEqual(0x1234, self.cpu.pc)
+        self.assertEqual(7, cycles)
+        self.assertEqual(0x1, self.cpu.p_irq)
+        self.assertEqual(0x7D, self.cpu.s)
+
+        self.assertEqual(0xAB, self.cpu.bus.read(0x0180))
+        self.assertEqual(0xCD, self.cpu.bus.read(0x017F))
+
+        pushed_status = self.cpu.bus.read(0x017E)
+        self.assertEqual(0, (pushed_status >> 4) & 1)
+
+    def test_irq_ignored_when_masked(self) -> None:
+        zelda = Cartridge()
+        zelda.load(f"{CARTRIDGE_PATH}zelda/Zelda.NES")
+
+        self.cpu.bus.cartridge = zelda
+        start_pc = 0x4444
+        self.cpu.pc = start_pc
+        self.cpu.s = 0xFF
+        self.cpu.p_irq = 0x1
+
+        self.cpu.bus.write(0x01FF, 0x00)
+        self.cpu.bus.write(0x01FE, 0x00)
+
+        cycles = self.cpu.irq()
+
+        self.assertEqual(
+            start_pc, self.cpu.pc, "PC should not change when IRQ is masked"
+        )
+        self.assertNotEqual(
+            7, cycles, "Should not return 7 execution cycles if ignored"
+        )
+        self.assertEqual(
+            0xFF, self.cpu.s, "Stack pointer should not move when IRQ is masked"
+        )
+        self.assertEqual(0x00, self.cpu.bus.read(0x01FF), "Stack shouldn't be touched")
+
     def test_lda_immediate(self) -> None:
         self.write_bytes(START_PC, [0xA9, 0x42])
         self.write_bytes(START_PC + 2, [0xA9, 0x00])

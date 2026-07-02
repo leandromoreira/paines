@@ -60,7 +60,54 @@ class CPU6502:
         self.pc = (high << 8) | low
         self.s = 0xFD
         self.p_irq = 0x1
+        self.p_brk = 0x0
+        self.p_unused = 0x1
         self.compose_p()
+        return 7
+
+    def nmi(self) -> U8:
+        high_pc = (self.pc >> 8) & 0xFF
+        low_pc = self.pc & 0xFF
+
+        self.bus.write(0x0100 | self.s, high_pc)
+        self.s = (self.s - 1) & 0xFF
+        self.bus.write(0x0100 | self.s, low_pc)
+        self.s = (self.s - 1) & 0xFF
+
+        self.compose_p()
+        pushed_status = (self.p & ~0x10) | 0x20
+        self.bus.write(0x0100 | self.s, pushed_status)
+        self.s = (self.s - 1) & 0xFF
+
+        self.p_irq = 0x1
+        low_vector = self.bus.read(0xFFFA)
+        high_vector = self.bus.read(0xFFFB)
+        self.pc = (high_vector << 8) | low_vector
+
+        return 7
+
+    def irq(self) -> U8:
+        if self.p_irq == 1:
+            return 0
+
+        high_pc = (self.pc >> 8) & 0xFF
+        low_pc = self.pc & 0xFF
+
+        self.bus.write(0x0100 | self.s, high_pc)
+        self.s = (self.s - 1) & 0xFF
+        self.bus.write(0x0100 | self.s, low_pc)
+        self.s = (self.s - 1) & 0xFF
+
+        self.compose_p()
+        pushed_status = (self.p & ~0x10) | 0x20
+        self.bus.write(0x0100 | self.s, pushed_status)
+        self.s = (self.s - 1) & 0xFF
+
+        self.p_irq = 0x1
+        low_vector = self.bus.read(0xFFFE)
+        high_vector = self.bus.read(0xFFFF)
+        self.pc = (high_vector << 8) | low_vector
+
         return 7
 
     def compose_p(self) -> None:
