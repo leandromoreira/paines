@@ -23,4 +23,4 @@ tdd:
 	uv run --with pytest-watcher ptw .
 
 nestest:
-	uv run check_nes_test_log.py
+	uv run benchmark.py

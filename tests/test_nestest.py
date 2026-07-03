@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 import re
+import time
 
 from paines.ram.memory import RAM
 from paines.bus.bus import CPUBus
@@ -24,7 +25,7 @@ class TestNESTests(unittest.TestCase):
         nes_test = Cartridge()
         nes_test.load(NESTEST_PATH)
         bus = CPUBus(ram=ram, cartridge=nes_test)
-        cpu = CPU6502(bus=bus, debug=True, file_name=NESTEST_LOG_PATH)
+        cpu = CPU6502(bus=bus, debug=False, file_name=NESTEST_LOG_PATH)
 
         cpu.pc = 0xC000
         cpu.s = 0xFD
@@ -83,6 +84,4 @@ def verify_logs(log_path: str, official_log_path: str) -> bool:
                     f"Received (Emulator): PC:{e_pc} A:{e_a} X:{e_x} Y:{e_y} P:{e_p} SP:{e_sp} CYC:{e_cyc}"
                 )
                 return False
-
-    print("✅ Verification successful! All register and timing state tracks match.")
     return True

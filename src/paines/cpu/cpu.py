@@ -1386,6 +1386,8 @@ class CPU6502:
         self.p_dcm = (self.p >> 3) & 0x1
         self.p_overflow = (self.p >> 6) & 0x1
         self.p_sign = (self.p >> 7) & 0x1
+        self.p_unused = 0x1
+        self.p_brk = 0x0
 
         return False
 
