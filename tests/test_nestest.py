@@ -25,7 +25,7 @@ class TestNESTests(unittest.TestCase):
         nes_test = Cartridge()
         nes_test.load(NESTEST_PATH)
         bus = CPUBus(ram=ram, cartridge=nes_test)
-        cpu = CPU6502(bus=bus, debug=False, file_name=NESTEST_LOG_PATH)
+        cpu = CPU6502(bus=bus, debug=True, file_name=NESTEST_LOG_PATH)
 
         cpu.pc = 0xC000
         cpu.s = 0xFD
