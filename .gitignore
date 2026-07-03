@@ -10,5 +10,6 @@ wheels/
 .venv
 /tags
 *.log
+!nes_test_official.log
 
 output.txt

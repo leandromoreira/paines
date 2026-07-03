@@ -1156,3 +1156,56 @@ class Test6502Instructions(unittest.TestCase):
         cycles = self.cpu.execute()
 
         self.assertEqual(2, cycles)
+
+    def test_clear_flags(self) -> None:
+        self.cpu.p_carry = 0x1
+        self.cpu.p_irq = 0x1
+        self.cpu.p_dcm = 0x1
+        self.cpu.p_overflow = 0x1
+
+        self.write_bytes(START_PC, [0x18])
+        self.cpu.pc = START_PC
+        cycles = self.cpu.execute()
+        self.assertEqual(0x0, self.cpu.p_carry)
+        self.assertEqual(2, cycles)
+
+        self.write_bytes(START_PC, [0x58])
+        self.cpu.pc = START_PC
+        cycles = self.cpu.execute()
+        self.assertEqual(0x0, self.cpu.p_irq)
+        self.assertEqual(2, cycles)
+
+        self.write_bytes(START_PC, [0xD8])
+        self.cpu.pc = START_PC
+        cycles = self.cpu.execute()
+        self.assertEqual(0x0, self.cpu.p_dcm)
+        self.assertEqual(2, cycles)
+
+        self.write_bytes(START_PC, [0xB8])
+        self.cpu.pc = START_PC
+        cycles = self.cpu.execute()
+        self.assertEqual(0x0, self.cpu.p_overflow)
+        self.assertEqual(2, cycles)
+
+    def test_set_flags(self) -> None:
+        self.cpu.p_carry = 0x0
+        self.cpu.p_irq = 0x0
+        self.cpu.p_dcm = 0x0
+
+        self.write_bytes(START_PC, [0x38])
+        self.cpu.pc = START_PC
+        cycles = self.cpu.execute()
+        self.assertEqual(0x1, self.cpu.p_carry)
+        self.assertEqual(2, cycles)
+
+        self.write_bytes(START_PC, [0x78])
+        self.cpu.pc = START_PC
+        cycles = self.cpu.execute()
+        self.assertEqual(0x1, self.cpu.p_irq)
+        self.assertEqual(2, cycles)
+
+        self.write_bytes(START_PC, [0xF8])
+        self.cpu.pc = START_PC
+        cycles = self.cpu.execute()
+        self.assertEqual(0x1, self.cpu.p_dcm)
+        self.assertEqual(2, cycles)

@@ -1,10 +1,11 @@
 test:
 	rm -f output.txt
+	rm -f nes_test.log
 	uvx ruff format .
-	uv run --with pytest-cov pytest -s --cov=src/
 	uvx ty check
 	uvx ruff check . --select ANN --unsafe-fixes --fix
 	uvx mypy .
+	uv run --with pytest-cov pytest -s --cov=src/
 build:
 	uv build
 audit:
@@ -20,3 +21,6 @@ complexity_details:
 
 tdd:
 	uv run --with pytest-watcher ptw .
+
+nestest:
+	uv run check_nes_test_log.py

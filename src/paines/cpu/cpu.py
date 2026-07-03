@@ -29,7 +29,12 @@ class DebugTrace:
 
 
 class CPU6502:
-    def __init__(self, bus: CPUBus = cpu_bus_builder(), debug: bool = False) -> None:
+    def __init__(
+        self,
+        bus: CPUBus = cpu_bus_builder(),
+        debug: bool = False,
+        file_name: str = "output.txt",
+    ) -> None:
         self.pc: U16 = 0xFFFC
         self.a: U8 = 0x00
         self.x: U8 = 0x00
@@ -49,7 +54,7 @@ class CPU6502:
         self.total_cycle: int = 0
         self.debug = debug
         self.traces: list[str] = []
-        self.debug_file = open("output.txt", "a")
+        self.debug_file = open(file_name, "a")
 
         self.instruction_set: dict[U8, Instruction] = {}
         self.init_table()
@@ -276,7 +281,7 @@ class CPU6502:
         bytes_str = f"{opcode_plus_operand_bytes:<9}"
         asm_trace = f"{asm_trace:<32}"
         self.compose_p()
-        log_line = f"{memory_slice[0].address:04X}  {bytes_str} {asm_trace}A:{self.a:02X} X:{self.x:02X} Y:{self.y:02X} P:{self.p:02X} SP:{self.s:02X}"
+        log_line = f"{memory_slice[0].address:04X}  {bytes_str} {asm_trace}A:{self.a:02X} X:{self.x:02X} Y:{self.y:02X} P:{self.p:02X} SP:{self.s:02X} CYC:{self.total_cycle + 7}"
 
         self.debug_file.write(f"{log_line}\n")
         self.debug_file.flush()
@@ -710,6 +715,374 @@ class CPU6502:
             "NOP", self.nop, self._mode_implied, 2, 0xEA
         )
 
+        for op in [0x1A, 0x3A, 0x5A, 0x7A, 0xDA, 0xFA]:
+            self.instruction_set[op] = Instruction(
+                "NOP", self.nop, self._mode_implied, 2, op
+            )
+
+        for op in [0x04, 0x44, 0x64]:
+            self.instruction_set[op] = Instruction(
+                "NOP", self.nop, self._mode_zp, 3, op
+            )
+
+        for op in [0x80, 0x82, 0x89, 0xC2, 0xE2]:
+            self.instruction_set[op] = Instruction(
+                "NOP", self.nop, self._mode_imm, 2, op
+            )
+
+        for op in [0x14, 0x34, 0x54, 0x74, 0xD4, 0xF4]:
+            self.instruction_set[op] = Instruction(
+                "NOP", self.nop, self._mode_zp_x, 4, op
+            )
+
+        self.instruction_set[0x0C] = Instruction(
+            "NOP", self.nop, self._mode_abs, 4, 0x0C
+        )
+
+        for op in [0x1C, 0x3C, 0x5C, 0x7C, 0xDC, 0xFC]:
+            self.instruction_set[op] = Instruction(
+                "NOP", self.nop_indexed, self._mode_abs_x, 4, op
+            )
+
+        self.instruction_set[0x18] = Instruction(
+            "CLC", self.clc, self._mode_implied, 2, 0x18
+        )
+        self.instruction_set[0x58] = Instruction(
+            "CLI", self.cli, self._mode_implied, 2, 0x58
+        )
+        self.instruction_set[0xD8] = Instruction(
+            "CLD", self.cld, self._mode_implied, 2, 0xD8
+        )
+        self.instruction_set[0xB8] = Instruction(
+            "CLV", self.clv, self._mode_implied, 2, 0xB8
+        )
+        self.instruction_set[0x38] = Instruction(
+            "SEC", self.sec, self._mode_implied, 2, 0x38
+        )
+        self.instruction_set[0x78] = Instruction(
+            "SEI", self.sei, self._mode_implied, 2, 0x78
+        )
+        self.instruction_set[0xF8] = Instruction(
+            "SED", self.sed, self._mode_implied, 2, 0xF8
+        )
+        self.instruction_set[0xE8] = Instruction(
+            "INX", self.inx, self._mode_implied, 2, 0xE8
+        )
+        self.instruction_set[0xC8] = Instruction(
+            "INY", self.iny, self._mode_implied, 2, 0xC8
+        )
+        self.instruction_set[0xCA] = Instruction(
+            "DEX", self.dex, self._mode_implied, 2, 0xCA
+        )
+        self.instruction_set[0x88] = Instruction(
+            "DEY", self.dey, self._mode_implied, 2, 0x88
+        )
+        self.instruction_set[0xA3] = Instruction(
+            "LAX", self.lax, self._mode_ind_x, 6, 0xA3
+        )
+        self.instruction_set[0xA7] = Instruction(
+            "LAX", self.lax, self._mode_zp, 3, 0xA7
+        )
+        self.instruction_set[0xAF] = Instruction(
+            "LAX", self.lax, self._mode_abs, 4, 0xAF
+        )
+        self.instruction_set[0xB3] = Instruction(
+            "LAX", self.lax, self._mode_ind_y, 5, 0xB3
+        )
+        self.instruction_set[0xB7] = Instruction(
+            "LAX", self.lax, self._mode_zp_y, 4, 0xB7
+        )
+        self.instruction_set[0xBF] = Instruction(
+            "LAX", self.lax, self._mode_abs_y, 4, 0xBF
+        )
+        self.instruction_set[0x83] = Instruction(
+            "SAX", self.sax, self._mode_ind_x, 6, 0x83
+        )
+        self.instruction_set[0x87] = Instruction(
+            "SAX", self.sax, self._mode_zp, 3, 0x87
+        )
+        self.instruction_set[0x8F] = Instruction(
+            "SAX", self.sax, self._mode_abs, 4, 0x8F
+        )
+        self.instruction_set[0x97] = Instruction(
+            "SAX", self.sax, self._mode_zp_y, 4, 0x97
+        )
+        self.instruction_set[0xEB] = Instruction(
+            "SBC", self.sbc, self._mode_imm, 2, 0xEB
+        )
+        self.instruction_set[0xC3] = Instruction(
+            "DCP", self.dcp, self._mode_ind_x, 8, 0xC3
+        )
+        self.instruction_set[0xC7] = Instruction(
+            "DCP", self.dcp, self._mode_zp, 5, 0xC7
+        )
+        self.instruction_set[0xCF] = Instruction(
+            "DCP", self.dcp, self._mode_abs, 6, 0xCF
+        )
+        self.instruction_set[0xD3] = Instruction(
+            "DCP", self.dcp, self._mode_ind_y, 8, 0xD3
+        )
+        self.instruction_set[0xD7] = Instruction(
+            "DCP", self.dcp, self._mode_zp_x, 6, 0xD7
+        )
+        self.instruction_set[0xDB] = Instruction(
+            "DCP", self.dcp, self._mode_abs_y, 7, 0xDB
+        )
+        self.instruction_set[0xDF] = Instruction(
+            "DCP", self.dcp, self._mode_abs_x, 7, 0xDF
+        )
+        self.instruction_set[0xE3] = Instruction(
+            "ISC", self.isc, self._mode_ind_x, 8, 0xE3
+        )
+        self.instruction_set[0xE7] = Instruction(
+            "ISC", self.isc, self._mode_zp, 5, 0xE7
+        )
+        self.instruction_set[0xEF] = Instruction(
+            "ISC", self.isc, self._mode_abs, 6, 0xEF
+        )
+        self.instruction_set[0xF3] = Instruction(
+            "ISC", self.isc, self._mode_ind_y, 8, 0xF3
+        )
+        self.instruction_set[0xF7] = Instruction(
+            "ISC", self.isc, self._mode_zp_x, 6, 0xF7
+        )
+        self.instruction_set[0xFB] = Instruction(
+            "ISC", self.isc, self._mode_abs_y, 7, 0xFB
+        )
+        self.instruction_set[0xFF] = Instruction(
+            "ISC", self.isc, self._mode_abs_x, 7, 0xFF
+        )
+        self.instruction_set[0x03] = Instruction(
+            "SLO", self.slo, self._mode_ind_x, 8, 0x03
+        )
+        self.instruction_set[0x07] = Instruction(
+            "SLO", self.slo, self._mode_zp, 5, 0x07
+        )
+        self.instruction_set[0x0F] = Instruction(
+            "SLO", self.slo, self._mode_abs, 6, 0x0F
+        )
+        self.instruction_set[0x13] = Instruction(
+            "SLO", self.slo, self._mode_ind_y, 8, 0x13
+        )
+        self.instruction_set[0x17] = Instruction(
+            "SLO", self.slo, self._mode_zp_x, 6, 0x17
+        )
+        self.instruction_set[0x1B] = Instruction(
+            "SLO", self.slo, self._mode_abs_y, 7, 0x1B
+        )
+        self.instruction_set[0x1F] = Instruction(
+            "SLO", self.slo, self._mode_abs_x, 7, 0x1F
+        )
+        self.instruction_set[0x23] = Instruction(
+            "RLA", self.rla, self._mode_ind_x, 8, 0x23
+        )
+        self.instruction_set[0x27] = Instruction(
+            "RLA", self.rla, self._mode_zp, 5, 0x27
+        )
+        self.instruction_set[0x2F] = Instruction(
+            "RLA", self.rla, self._mode_abs, 6, 0x2F
+        )
+        self.instruction_set[0x33] = Instruction(
+            "RLA", self.rla, self._mode_ind_y, 8, 0x33
+        )
+        self.instruction_set[0x37] = Instruction(
+            "RLA", self.rla, self._mode_zp_x, 6, 0x37
+        )
+        self.instruction_set[0x3B] = Instruction(
+            "RLA", self.rla, self._mode_abs_y, 7, 0x3B
+        )
+        self.instruction_set[0x3F] = Instruction(
+            "RLA", self.rla, self._mode_abs_x, 7, 0x3F
+        )
+        self.instruction_set[0x43] = Instruction(
+            "SRE", self.sre, self._mode_ind_x, 8, 0x43
+        )
+        self.instruction_set[0x47] = Instruction(
+            "SRE", self.sre, self._mode_zp, 5, 0x47
+        )
+        self.instruction_set[0x4F] = Instruction(
+            "SRE", self.sre, self._mode_abs, 6, 0x4F
+        )
+        self.instruction_set[0x53] = Instruction(
+            "SRE", self.sre, self._mode_ind_y, 8, 0x53
+        )
+        self.instruction_set[0x57] = Instruction(
+            "SRE", self.sre, self._mode_zp_x, 6, 0x57
+        )
+        self.instruction_set[0x5B] = Instruction(
+            "SRE", self.sre, self._mode_abs_y, 7, 0x5B
+        )
+        self.instruction_set[0x5F] = Instruction(
+            "SRE", self.sre, self._mode_abs_x, 7, 0x5F
+        )
+        self.instruction_set[0x63] = Instruction(
+            "RRA", self.rra, self._mode_ind_x, 8, 0x63
+        )
+        self.instruction_set[0x67] = Instruction(
+            "RRA", self.rra, self._mode_zp, 5, 0x67
+        )
+        self.instruction_set[0x6F] = Instruction(
+            "RRA", self.rra, self._mode_abs, 6, 0x6F
+        )
+        self.instruction_set[0x73] = Instruction(
+            "RRA", self.rra, self._mode_ind_y, 8, 0x73
+        )
+        self.instruction_set[0x77] = Instruction(
+            "RRA", self.rra, self._mode_zp_x, 6, 0x77
+        )
+        self.instruction_set[0x7B] = Instruction(
+            "RRA", self.rra, self._mode_abs_y, 7, 0x7B
+        )
+        self.instruction_set[0x7F] = Instruction(
+            "RRA", self.rra, self._mode_abs_x, 7, 0x7F
+        )
+
+    def sre(self, address: U16) -> bool:
+        value = self.bus.read(address)
+        self.p_carry = value & 0x1
+        shifted_value = value >> 1
+        self.bus.write(address, shifted_value)
+        self.a ^= shifted_value
+        self.p_zero = 1 if self.a == 0 else 0
+        self.p_sign = (self.a >> 7) & 0x1
+
+        return False
+
+    def rra(self, address: U16) -> bool:
+        value = self.bus.read(address)
+        incoming_carry = self.p_carry
+        self.p_carry = value & 0x1
+        rotated_value = (value >> 1) | (incoming_carry << 7)
+        self.bus.write(address, rotated_value)
+        sum_result = self.a + rotated_value + self.p_carry
+        self.p_overflow = (
+            1 if ((self.a ^ sum_result) & (rotated_value ^ sum_result) & 0x80) else 0
+        )
+        result_8bit = sum_result & 0xFF
+        self.p_zero = 1 if result_8bit == 0 else 0
+        self.p_sign = (result_8bit >> 7) & 0x1
+        self.p_carry = 1 if sum_result > 0xFF else 0
+        self.a = result_8bit
+
+        return False
+
+    def rla(self, address: U16) -> bool:
+        value = self.bus.read(address)
+        incoming_carry = self.p_carry
+        self.p_carry = (value >> 7) & 0x1
+        rotated_value = ((value << 1) | incoming_carry) & 0xFF
+        self.bus.write(address, rotated_value)
+        self.a &= rotated_value
+        self.p_zero = 1 if self.a == 0 else 0
+        self.p_sign = (self.a >> 7) & 0x1
+
+        return False
+
+    def slo(self, address: U16) -> bool:
+        value = self.bus.read(address)
+        self.p_carry = (value >> 7) & 0x1
+        shifted_value = (value << 1) & 0xFF
+        self.bus.write(address, shifted_value)
+        self.a |= shifted_value
+        self.p_zero = 1 if self.a == 0 else 0
+        self.p_sign = (self.a >> 7) & 0x1
+
+        return False
+
+    def isc(self, address: U16) -> bool:
+        value = (self.bus.read(address) + 1) & 0xFF
+        self.bus.write(address, value)
+        inverted_value = value ^ 0xFF
+        sum_result = self.a + inverted_value + self.p_carry
+        diff = (self.a - value - (1 - self.p_carry)) & 0xFFFF
+        self.p_zero = 1 if (diff & 0xFF) == 0 else 0
+        self.p_sign = (diff >> 7) & 0x1
+        self.p_carry = 1 if sum_result > 0xFF else 0
+        self.p_overflow = (
+            1 if ((self.a ^ sum_result) & (inverted_value ^ sum_result) & 0x80) else 0
+        )
+        self.a = diff & 0xFF
+
+        return False
+
+    def dcp(self, address: U16) -> bool:
+        value = (self.bus.read(address) - 1) & 0xFF
+        self.bus.write(address, value)
+
+        diff = (self.a - value) & 0x1FF
+
+        self.p_carry = 1 if self.a >= value else 0
+        self.p_zero = 1 if self.a == value else 0
+        self.p_sign = (diff >> 7) & 0x1
+
+        return False
+
+    def sax(self, address: U16) -> bool:
+        combined_value = self.a & self.x
+        self.bus.write(address, combined_value)
+        return False
+
+    def lax(self, address: U16) -> bool:
+        value = self.bus.read(address)
+        self.a = value
+        self.x = value
+
+        self.p_zero = 1 if value == 0 else 0
+        self.p_sign = (value >> 7) & 0x1
+
+        return True
+
+    def dey(self, address: U16) -> bool:
+        self.y = (self.y - 1) & 0xFF
+        self.check_nz(self.y)
+        return False
+
+    def dex(self, address: U16) -> bool:
+        self.x = (self.x - 1) & 0xFF
+        self.check_nz(self.x)
+        return False
+
+    def iny(self, address: U16) -> bool:
+        self.y = (self.y + 1) & 0xFF
+        self.check_nz(self.y)
+        return False
+
+    def inx(self, address: U16) -> bool:
+        self.x = (self.x + 1) & 0xFF
+        self.check_nz(self.x)
+        return False
+
+    def clc(self, _: U16) -> bool:
+        self.p_carry = 0x0
+        return False
+
+    def cli(self, _: U16) -> bool:
+        self.p_irq = 0x0
+        return False
+
+    def cld(self, _: U16) -> bool:
+        self.p_dcm = 0x0
+        return False
+
+    def clv(self, _: U16) -> bool:
+        self.p_overflow = 0x0
+        return False
+
+    def sec(self, _: U16) -> bool:
+        self.p_carry = 0x1
+        return False
+
+    def sei(self, _: U16) -> bool:
+        self.p_irq = 0x1
+        return False
+
+    def sed(self, _: U16) -> bool:
+        self.p_dcm = 0x1
+        return False
+
+    def nop_indexed(self, _: U16) -> bool:
+        return True
+
     def nop(self, _: U16) -> bool:
         return False
 
@@ -1011,8 +1384,6 @@ class CPU6502:
         self.p_zero = (self.p >> 1) & 0x1
         self.p_irq = (self.p >> 2) & 0x1
         self.p_dcm = (self.p >> 3) & 0x1
-        self.p_brk = (self.p >> 4) & 0x1
-        self.p_unused = (self.p >> 5) & 0x1
         self.p_overflow = (self.p >> 6) & 0x1
         self.p_sign = (self.p >> 7) & 0x1
 
