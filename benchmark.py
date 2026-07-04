@@ -23,11 +23,6 @@ def setup_cpu() -> CPU6502:
 
 
 def run_sustained_benchmark() -> None:
-    for _ in range(100):
-        cpu = setup_cpu()
-        for _ in range(8991):
-            cpu.execute()
-
     cpu = setup_cpu()
 
     start_time = time.perf_counter()
@@ -39,7 +34,7 @@ def run_sustained_benchmark() -> None:
     cycles = 26553
 
     print(f"\n--------------------------------------------------------")
-    print(f"Warmed-up CPU Execution Time: {duration_ms:.6f} ms")
+    print(f"CPU Execution Time           : {duration_ms:.6f} ms")
     print(f"NES CPU Cycles               : {cycles}")
     print(f"Real time / NES CPU Cycles   : {duration_ms / cycles:.6f} ms")
     print(f"--------------------------------------------------------")
