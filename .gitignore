@@ -11,5 +11,5 @@ wheels/
 /tags
 *.log
 !nes_test_official.log
-
+.coverage
 output.txt
