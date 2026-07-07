@@ -56,7 +56,7 @@ class CPU6502:
         self.traces: list[str] = []
         self.debug_file = open(file_name, "a")
 
-        self.instruction_set: dict[U8, Instruction] = {}
+        self.instruction_set: list[Instruction | None] = [None] * 256
         self.init_table()
 
     def reset(self) -> U8:
@@ -203,7 +203,7 @@ class CPU6502:
         op_code: U8 = self.bus.read(self.pc)
         self.pc += 1
 
-        instruction = self.instruction_set.get(op_code)
+        instruction = self.instruction_set[op_code]
         if instruction is None:
             raise NotImplementedError(f"Opcode {hex(op_code)} not implemented!")
 
