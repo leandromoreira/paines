@@ -15,7 +15,7 @@ class RAM:
     BYTE_MASK = 0xFF
 
     def __init__(self, size: U16 = 0x800, start_offset: U16 = 0x0000) -> None:
-        self.cells: list[U8] = [0] * size
+        self.cells = bytearray(size)
         self.start_offset = start_offset
         self.ram_mask: U16 = size - 1
 

@@ -14,8 +14,8 @@ ONE_PRG_BANK: U16 = 0x4000
 class Cartridge:
     # https://www.nesdev.org/wiki/INES#iNES_file_format
     def __init__(self) -> None:
-        self.prg: list[U8] = []
-        self.chr: list[U8] = []
+        self.prg: bytearray = bytearray()
+        self.chr: bytearray = bytearray()
         self.magic_id: bytes = b""
         self.prg_size: U8 = 0
         self.chr_size: U8 = 0
@@ -43,7 +43,7 @@ class Cartridge:
 
             self.has_battery_sram = bool(self.flags_6 & 0x02)
 
-            self.prg = list(rom.read(ONE_PRG_BANK * self.prg_size))
+            self.prg = bytearray(rom.read(ONE_PRG_BANK * self.prg_size))
             self.sram = [0] * (SRAM_END - SRAM_START + 1)
             if self.prg_size == 1:
                 self.prg_mask = (ONE_PRG_BANK * self.prg_size) - 1
