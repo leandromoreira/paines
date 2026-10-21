@@ -35,8 +35,7 @@ class PPUBus:
             return self.ram.read(self._resolve_nametable_mirroring(address))
 
         if address <= 0x3FFF:
-            # TODO: palette
-            return 0xFF
+            return self.palette_ram.read(self._resolve_palette_mirroring(address))
 
         return self.open_bus
 
@@ -53,6 +52,12 @@ class PPUBus:
             physical_bank = 0 if nametable_index in [0, 2] else 1
             return (physical_bank * 0x400) + offset
 
+    def _resolve_palette_mirroring(self, address: U16) -> U16:
+        palette_index: U16 = (address - 0x3F00) & 0x1F
+        if palette_index in (0x10, 0x14, 0x18, 0x1C):
+            palette_index -= 0x10
+        return palette_index
+
     def write(self, address: U16, value: U8) -> None:
         address = address & 0x3FFF
 
@@ -66,7 +71,9 @@ class PPUBus:
             return
 
         if address <= 0x3FFF:
-            # TODO: palette
+            self.palette_ram.write(
+                self._resolve_palette_mirroring(address), value & 0x3F
+            )
             return
 
         return
