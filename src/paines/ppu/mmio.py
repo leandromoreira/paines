@@ -46,7 +46,15 @@ class PPUMMIO:
                 self.ppu.scroll_t |= (fine_y << 12) | (coarse_y << 5)
                 self.ppu.scroll_t &= 0b111111111111111
         elif address == 0x2006:
-            pass
+            if self.ppu.write_toggle == 0:
+                self.ppu.write_toggle = 1
+                self.ppu.scroll_t = (self.ppu.scroll_t & 0x00FF) | ((value & 0x3F) << 8)
+            else:
+                self.ppu.write_toggle = 0
+                self.ppu.scroll_t = (self.ppu.scroll_t & 0x7F00) | value
+                self.ppu.scroll_v = self.ppu.scroll_t
+        elif address == 0x2007:
+            self._write_vram_data(value)
 
     def read(self, address: U16) -> U8:
         address = 0x2000 + (address % 8)
@@ -66,12 +74,27 @@ class PPUMMIO:
             self.open_bus = self.ppu.read_oam()
             return self.open_bus
         elif address == 0x2007:
-            value_to_return = self.ppu.read_buffer
+            vram_address = self.ppu.scroll_v & 0x3FFF
+            fetched = self.ppu.read_vram(vram_address)
 
-            return value_to_return
+            if vram_address >= 0x3F00:
+                value_to_return = fetched
+                self.ppu.read_buffer = self.ppu.read_vram(vram_address - 0x1000)
+            else:
+                value_to_return = self.ppu.read_buffer
+                self.ppu.read_buffer = fetched
+
+            self.ppu.scroll_v = (self.ppu.scroll_v + (32 if self.ppu.vram_increment else 1)) & 0x7FFF
+            self.open_bus = value_to_return
+            return self.open_bus
 
         return self.open_bus
 
+    def _write_vram_data(self, value: U8) -> None:
+        self.ppu.write_vram(self.ppu.scroll_v & 0x3FFF, value)
+        increment = 32 if self.ppu.vram_increment else 1
+        self.ppu.scroll_v = (self.ppu.scroll_v + increment) & 0x7FFF
 
-def ppu_mmio_builder() -> PPUMMIO:
-    return PPUMMIO()
+
+def ppu_mmio_builder(ppu: PPU | None = None) -> PPUMMIO:
+    return PPUMMIO(ppu=ppu)

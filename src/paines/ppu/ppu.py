@@ -37,7 +37,7 @@ class PPU:
         self.scroll_x: U3 = 0
 
         self.read_buffer: U8 = 0x0
-        self.bus = bus or ppu_bus_builder()
+        self.bus = bus if bus is not None else ppu_bus_builder()
 
     def write_oam(self, value: U8) -> None:
         self.oam_memory[self.oam_address] = value
@@ -53,5 +53,5 @@ class PPU:
         return self.bus.read(address)
 
 
-def ppu_builder() -> PPU:
-    return PPU()
+def ppu_builder(bus: PPUBus | None = None) -> PPU:
+    return PPU(bus=bus)

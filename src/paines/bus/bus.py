@@ -1,5 +1,7 @@
 from paines.cartridge.cartridge import Cartridge, cartridge_builder
+from paines.bus.ppu import ppu_bus_builder
 from paines.ppu.mmio import PPUMMIO, ppu_mmio_builder
+from paines.ppu.ppu import ppu_builder
 from paines.ram.memory import RAM, ram_builder
 from paines.types import U16, U8
 
@@ -24,7 +26,10 @@ class CPUBus:
         self.ram = ram or ram_builder()  # 0x0000 - 0x1FFF WRAM
         self.open_bus: U8 = 0
         self.cartridge = cartridge or cartridge_builder()  # 0x4018 - 0xFFFF - Cartridge
-        self.ppu_mmio = ppu_mmio or ppu_mmio_builder()
+        if ppu_mmio is None:
+            ppu = ppu_builder(bus=ppu_bus_builder(cartridge=self.cartridge))
+            ppu_mmio = ppu_mmio_builder(ppu)
+        self.ppu_mmio = ppu_mmio
 
     def read(self, address: U16) -> U8:
         if address <= 0x1FFF:

@@ -1,4 +1,4 @@
-from paines.types import U16, U8, U4
+from paines.types import U16, U8, U4, U1
 
 # https://problemkaputt.de/everynes.htm#techdata
 #   4018h-5FFFh   Cartridge Expansion Area almost 8K
@@ -20,14 +20,18 @@ class Cartridge:
         self.magic_id: bytes = b""
         self.prg_size: U8 = 0
         self.chr_size: U8 = 0
+        self.chr_is_ram: bool = True
         self.flags_6: U8 = 0
         self.has_battery_sram: bool = False
+        self.nametable_mirroring: U1 = 0
         self.flags_7: U8 = 0
+        self.mapper_id: U8 = 0
         self.prg_ram_size: U8 = 0
         self.flags_9: U8 = 0
         self.flags_10: U8 = 0
         self.unused: bytes = b""
         self.prg_mask: U16 = 0xFFFF
+        self.chr = bytearray(ONE_CHR_BANK)
 
     def load(self, file: str) -> None:
         with open(file, "rb") as rom:
@@ -44,14 +48,15 @@ class Cartridge:
 
             self.has_battery_sram = bool(self.flags_6 & 0x02)
             self.nametable_mirroring = self.flags_6 & 0b1
-            self.contains_battery = (self.flags_6 >> 1) & 0b1
 
             low_mapper_id: U4 = self.flags_6 >> 4
             high_mapper_id: U4 = self.flags_7 >> 4
             self.mapper_id = (high_mapper_id << 4) | low_mapper_id
 
             self.prg = bytearray(rom.read(ONE_PRG_BANK * self.prg_size))
-            self.chr = bytearray(rom.read(ONE_CHR_BANK * self.chr_size))
+            self.chr_is_ram = self.chr_size == 0
+            chr_data = rom.read(ONE_CHR_BANK * self.chr_size)
+            self.chr = bytearray(chr_data) if chr_data else bytearray(ONE_CHR_BANK)
             self.sram = [0] * (SRAM_END - SRAM_START + 1)
             if self.prg_size == 1:
                 self.prg_mask = (ONE_PRG_BANK * self.prg_size) - 1
@@ -78,6 +83,10 @@ class Cartridge:
         if address <= 0x1FFF:
             return self.chr[address]
         return 0x0
+
+    def write_chr(self, address: U16, value: U8) -> None:
+        if self.chr_is_ram and address <= 0x1FFF:
+            self.chr[address] = value
 
 
 def cartridge_builder() -> Cartridge:

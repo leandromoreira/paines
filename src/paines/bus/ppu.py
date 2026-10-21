@@ -57,7 +57,7 @@ class PPUBus:
         address = address & 0x3FFF
 
         if address <= 0x1FFF:
-            # TODO: maybe mappers?
+            self.cartridge.write_chr(address, value)
             return
 
         if address <= 0x3EFF:
@@ -72,5 +72,9 @@ class PPUBus:
         return
 
 
-def ppu_bus_builder() -> PPUBus:
-    return PPUBus()
+def ppu_bus_builder(
+    ram: RAM | None = None,
+    cartridge: Cartridge | None = None,
+    palette_ram: RAM | None = None,
+) -> PPUBus:
+    return PPUBus(ram=ram, cartridge=cartridge, palette_ram=palette_ram)

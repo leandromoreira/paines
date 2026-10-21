@@ -47,3 +47,19 @@ class TestNesCartridge(unittest.TestCase):
         # simulating latest read
         open_bus = zelda.read(0x6100, high)
         self.assertEqual(open_bus, high)
+
+
+def test_chr_ram_is_allocated_and_writable(tmp_path: Path) -> None:
+    rom_path = tmp_path / "chr-ram.nes"
+    header = bytearray(16)
+    header[:4] = b"NES\x1a"
+    header[4] = 1
+    rom_path.write_bytes(header + bytes(0x4000))
+
+    cartridge = Cartridge()
+    cartridge.load(str(rom_path))
+
+    assert cartridge.chr_is_ram
+    assert len(cartridge.chr) == 0x2000
+    cartridge.write_chr(0x1234, 0xA5)
+    assert cartridge.read_chr(0x1234) == 0xA5
