@@ -1,4 +1,4 @@
-from paines.types import U16, U8
+from paines.types import U16, U8, U4
 
 # https://problemkaputt.de/everynes.htm#techdata
 #   4018h-5FFFh   Cartridge Expansion Area almost 8K
@@ -9,6 +9,7 @@ SRAM_START: U16 = 0x6000
 SRAM_END: U16 = 0x7FFF
 SRAM_MASK: U16 = SRAM_END - SRAM_START
 ONE_PRG_BANK: U16 = 0x4000
+ONE_CHR_BANK: U16 = 0x2000
 
 
 class Cartridge:
@@ -42,8 +43,15 @@ class Cartridge:
             self.unused = header[11:16]
 
             self.has_battery_sram = bool(self.flags_6 & 0x02)
+            self.nametable_mirroring = self.flags_6 & 0b1
+            self.contains_battery = (self.flags_6 >> 1) & 0b1
+
+            low_mapper_id: U4 = self.flags_6 >> 4
+            high_mapper_id: U4 = self.flags_7 >> 4
+            self.mapper_id = (high_mapper_id << 4) | low_mapper_id
 
             self.prg = bytearray(rom.read(ONE_PRG_BANK * self.prg_size))
+            self.chr = bytearray(rom.read(ONE_CHR_BANK * self.chr_size))
             self.sram = [0] * (SRAM_END - SRAM_START + 1)
             if self.prg_size == 1:
                 self.prg_mask = (ONE_PRG_BANK * self.prg_size) - 1
@@ -65,6 +73,11 @@ class Cartridge:
             self.prg[(address - CPU_PRG_START) & self.prg_mask] = value
             return
         return
+
+    def read_chr(self, address: U16) -> U8:
+        if address <= 0x1FFF:
+            return self.chr[address]
+        return 0x0
 
 
 def cartridge_builder() -> Cartridge:
