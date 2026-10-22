@@ -71,7 +71,7 @@ effects, so this is an early preview rather than a complete game image.
 
 ## Playing a ROM
 
-ROMs using mappers 0 (NROM), 1 (MMC1), 2 (UxROM) and 3 (CNROM) can be played in a window (requires the optional `pygame-ce` dependency):
+ROMs using mappers 0 (NROM), 1 (MMC1), 2 (UxROM), 3 (CNROM) and 4 (MMC3) can be played in a window (requires the optional `pygame-ce` dependency):
 
 ```sh
 uv run --extra play paines play path/to/game.nes --scale 3

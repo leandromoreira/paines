@@ -76,7 +76,7 @@ def test_status_read_clears_vblank_but_does_not_cancel_pending_nmi() -> None:
 def test_cpu_services_pending_ppu_nmi_and_advances_timing(tmp_path) -> None:
     bus = CPUBus()
     bus.cartridge.prg = bytearray(0x8000)
-    bus.cartridge.prg_offsets = [0, 0x4000]
+    bus.cartridge.prg_offsets = [0, 0x2000, 0x4000, 0x6000]
     bus.cartridge.prg[0x7FFA] = 0x78
     bus.cartridge.prg[0x7FFB] = 0x56
     ppu = bus.ppu_mmio.ppu
@@ -111,7 +111,7 @@ def test_frame_boundary_renders_and_exposes_a_frame() -> None:
 def test_cpu_run_frame_advances_until_frame_is_ready(tmp_path) -> None:
     bus = CPUBus()
     bus.cartridge.prg = bytearray(0x8000)
-    bus.cartridge.prg_offsets = [0, 0x4000]
+    bus.cartridge.prg_offsets = [0, 0x2000, 0x4000, 0x6000]
     bus.cartridge.prg[0:3] = b"\x4c\x00\x80"
     cpu = CPU6502(bus=bus, file_name=str(tmp_path / "cpu.log"))
     cpu.pc = 0x8000
@@ -176,7 +176,7 @@ def test_scroll_written_mid_frame_applies_to_later_scanlines() -> None:
 def test_status_read_sees_vblank_that_starts_during_the_instruction(tmp_path) -> None:
     bus = CPUBus()
     bus.cartridge.prg = bytearray(0x8000)
-    bus.cartridge.prg_offsets = [0, 0x4000]
+    bus.cartridge.prg_offsets = [0, 0x2000, 0x4000, 0x6000]
     bus.cartridge.prg[0:3] = b"\xad\x02\x20"  # LDA $2002 (4 cycles, reads on the last one)
     ppu = bus.ppu_mmio.ppu
     ppu.scanline, ppu.dot = 241, 0  # vblank starts 1 dot in, well before the read
@@ -188,3 +188,38 @@ def test_status_read_sees_vblank_that_starts_during_the_instruction(tmp_path) ->
     assert cpu.a & 0x80
     assert ppu.v_blank_status == 0
     assert (ppu.scanline, ppu.dot) == (241, 12)
+
+
+def test_ppu_clocks_mapper_once_per_rendered_scanline_only_when_rendering() -> None:
+    bus = CPUBus()
+    clocks: list[int] = []
+    bus.cartridge.mapper.clock_scanline = lambda: clocks.append(1)  # type: ignore[method-assign]
+    ppu = bus.ppu_mmio.ppu
+
+    ppu.advance_dots(PPU_DOTS_PER_FRAME)
+    assert clocks == []
+
+    ppu.bg_enabled = 1
+    clocks.clear()
+    ppu.advance_dots(PPU_DOTS_PER_FRAME)
+    assert len(clocks) == 241  # 240 visible scanlines + the pre-render line
+
+
+def test_cpu_takes_irq_from_cartridge_when_interrupts_are_enabled(tmp_path) -> None:
+    bus = CPUBus()
+    bus.cartridge.prg = bytearray(0x8000)
+    bus.cartridge.prg_offsets = [0, 0x2000, 0x4000, 0x6000]
+    bus.cartridge.prg[0x7FFE:0x8000] = b"\x00\x90"
+    bus.cartridge.prg[0:1] = b"\xea"  # NOP
+    cpu = CPU6502(bus=bus, file_name=str(tmp_path / "cpu.log"))
+    cpu.pc = 0x8000
+    cpu.p_irq = 1  # interrupts disabled
+
+    bus.cartridge.irq_pending = True
+    cpu.execute()
+    assert cpu.pc == 0x8001
+
+    cpu.pc = 0x8000
+    cpu.p_irq = 0
+    cpu.execute()
+    assert cpu.pc == 0x9000

@@ -204,6 +204,12 @@ class CPU6502:
             self.bus.ppu_mmio.ppu.advance_cpu_cycles(cycles)
             return cycles
 
+        if self.p_irq == 0 and self.bus.cartridge.irq_pending:
+            cycles = self.irq()
+            self.total_cycle += cycles
+            self.bus.ppu_mmio.ppu.advance_cpu_cycles(cycles)
+            return cycles
+
         cycles: U8 = 0
         initial_address: U16 = self.pc
         op_code: U8 = self.bus.read(self.pc)

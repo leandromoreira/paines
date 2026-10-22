@@ -33,6 +33,9 @@ class Mapper:
     def write(self, address: U16, value: U8) -> None:
         """Handle a CPU write to $8000-$FFFF."""
 
+    def clock_scanline(self) -> None:
+        """Called once per rendered scanline (stands in for the PPU A12 rising edge)."""
+
 
 class NROM(Mapper):
     # https://www.nesdev.org/wiki/NROM
@@ -127,7 +130,77 @@ class CNROM(Mapper):
         self.cartridge.map_chr(1, bank + 1)
 
 
-MAPPERS: dict[int, type[Mapper]] = {0: NROM, 1: MMC1, 2: UxROM, 3: CNROM}
+class MMC3(Mapper):
+    # https://www.nesdev.org/wiki/MMC3
+    uses_prg_ram = True
+
+    def reset(self) -> None:
+        self.bank_select = 0
+        self.registers = [0, 2, 4, 5, 6, 7, 0, 1]
+        self.irq_latch = 0
+        self.irq_counter = 0
+        self.irq_reload = False
+        self.irq_enabled = False
+        self.cartridge.irq_pending = False
+        self._apply()
+
+    def write(self, address: U16, value: U8) -> None:
+        even = not address & 1
+        region = (address >> 13) & 0b11
+        if region == 0:  # $8000-$9FFF
+            if even:
+                self.bank_select = value
+            else:
+                self.registers[self.bank_select & 7] = value
+            self._apply()
+        elif region == 1:  # $A000-$BFFF
+            if even:
+                self.cartridge.nametable_mirroring = HORIZONTAL if value & 1 else VERTICAL
+            # odd: PRG-RAM protect, ignored so games with battery RAM keep working
+        elif region == 2:  # $C000-$DFFF
+            if even:
+                self.irq_latch = value
+            else:
+                self.irq_counter = 0
+                self.irq_reload = True
+        else:  # $E000-$FFFF
+            self.irq_enabled = not even
+            if even:
+                self.cartridge.irq_pending = False
+
+    def clock_scanline(self) -> None:
+        if self.irq_counter == 0 or self.irq_reload:
+            self.irq_counter = self.irq_latch
+            self.irq_reload = False
+        else:
+            self.irq_counter -= 1
+        if self.irq_counter == 0 and self.irq_enabled:
+            self.cartridge.irq_pending = True
+
+    def _apply(self) -> None:
+        cartridge = self.cartridge
+        registers = self.registers
+        last = max(len(cartridge.prg) // 0x2000, 1) - 1
+
+        if self.bank_select & 0x40:
+            cartridge.map_prg_8k(0, last - 1)
+            cartridge.map_prg_8k(2, registers[6] & 0x3F)
+        else:
+            cartridge.map_prg_8k(0, registers[6] & 0x3F)
+            cartridge.map_prg_8k(2, last - 1)
+        cartridge.map_prg_8k(1, registers[7] & 0x3F)
+        cartridge.map_prg_8k(3, last)
+
+        # R0/R1 are 2 KB banks (low bit ignored); R2-R5 are 1 KB banks.
+        r0, r1 = registers[0] & ~1, registers[1] & ~1
+        layout = [r0, r0 | 1, r1, r1 | 1, registers[2], registers[3], registers[4], registers[5]]
+        if self.bank_select & 0x80:
+            layout = layout[4:] + layout[:4]
+        for slot, bank in enumerate(layout):
+            cartridge.map_chr_1k(slot, bank)
+
+
+MAPPERS: dict[int, type[Mapper]] = {0: NROM, 1: MMC1, 2: UxROM, 3: CNROM, 4: MMC3}
 
 
 def is_supported(mapper_id: int) -> bool:

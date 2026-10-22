@@ -12,6 +12,8 @@ SRAM_MASK: U16 = SRAM_END - SRAM_START
 ONE_PRG_BANK: U16 = 0x4000
 ONE_CHR_BANK: U16 = 0x2000
 CHR_PAGE: U16 = 0x1000
+PRG_PAGE_8K: U16 = 0x2000
+CHR_PAGE_1K: U16 = 0x0400
 TRAINER_SIZE = 512
 
 
@@ -37,8 +39,9 @@ class Cartridge:
         self.chr_rom = bytearray()
         self.sram = bytearray(SRAM_END - SRAM_START + 1)
         self.prg_banks = 1
-        # Start of the 16 KB PRG bank visible at $8000 and at $C000.
-        self.prg_offsets = [0, ONE_PRG_BANK]
+        # Start of the 8 KB PRG page visible at $8000, $A000, $C000 and $E000.
+        self.prg_offsets = [0, PRG_PAGE_8K, ONE_PRG_BANK, ONE_PRG_BANK + PRG_PAGE_8K]
+        self.irq_pending = False
         self.mapper: Mapper = NROM(self)
 
     def load(self, file: str) -> None:
@@ -78,7 +81,24 @@ class Cartridge:
         return self.has_battery_sram or self.mapper.uses_prg_ram
 
     def map_prg(self, slot: int, bank: int) -> None:
-        self.prg_offsets[slot] = (bank % self.prg_banks) * ONE_PRG_BANK
+        """Show 16 KB PRG bank `bank` in CPU window `slot` (0: $8000, 1: $C000)."""
+        start = (bank % self.prg_banks) * ONE_PRG_BANK
+        self.prg_offsets[slot * 2] = start
+        self.prg_offsets[slot * 2 + 1] = start + PRG_PAGE_8K
+
+    def map_prg_8k(self, slot: int, bank: int) -> None:
+        """Show 8 KB PRG page `bank` in CPU window `slot` (0: $8000, 1: $A000, 2: $C000, 3: $E000)."""
+        pages = max(len(self.prg) // PRG_PAGE_8K, 1)
+        self.prg_offsets[slot] = (bank % pages) * PRG_PAGE_8K
+
+    def map_chr_1k(self, slot: int, bank: int) -> None:
+        """Show 1 KB CHR-ROM page `bank` in PPU window `slot` (0-7, $0400 each)."""
+        if self.chr_is_ram:
+            return
+        pages = max(len(self.chr_rom) // CHR_PAGE_1K, 1)
+        source = (bank % pages) * CHR_PAGE_1K
+        target = slot * CHR_PAGE_1K
+        self.chr[target : target + CHR_PAGE_1K] = self.chr_rom[source : source + CHR_PAGE_1K]
 
     def map_chr(self, slot: int, bank: int) -> None:
         """Show 4 KB CHR-ROM page `bank` in PPU window `slot` (0: $0000, 1: $1000)."""
@@ -90,11 +110,11 @@ class Cartridge:
         self.chr[target : target + CHR_PAGE] = self.chr_rom[source : source + CHR_PAGE]
 
     def patch_prg(self, address: U16, value: U8) -> None:
-        self.prg[self.prg_offsets[(address >> 14) & 1] + (address & 0x3FFF)] = value
+        self.prg[self.prg_offsets[(address >> 13) & 3] + (address & 0x1FFF)] = value
 
     def read(self, address: U16, open_bus: U8) -> U8:
         if address >= 0x8000:
-            return self.prg[self.prg_offsets[(address >> 14) & 1] + (address & 0x3FFF)]
+            return self.prg[self.prg_offsets[(address >> 13) & 3] + (address & 0x1FFF)]
         if address >= SRAM_START and self.has_prg_ram:
             return self.sram[(address - SRAM_START) & SRAM_MASK]
         return open_bus

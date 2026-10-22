@@ -30,8 +30,8 @@ def serial_write(cartridge: Cartridge, address: int, value: int) -> None:
 
 
 def test_supported_mappers() -> None:
-    assert all(is_supported(mapper) for mapper in (0, 1, 2, 3))
-    assert not is_supported(4)
+    assert all(is_supported(mapper) for mapper in (0, 1, 2, 3, 4))
+    assert not is_supported(5)
 
 
 def test_nrom_16k_mirrors_and_32k_does_not(tmp_path: Path) -> None:
@@ -189,3 +189,117 @@ def test_mmc1_surom_selects_256k_half_with_chr_bit_4(tmp_path: Path) -> None:
     assert (cartridge.read(0x8000, 0), cartridge.read(0xC000, 0)) == (16, 31)
     serial_write(cartridge, 0xE000, 3)
     assert cartridge.read(0x8000, 0) == 19
+
+
+def make_mmc3(tmp_path: Path, prg_pages: int = 16, chr_pages: int = 64) -> Cartridge:
+    """prg_pages are 8 KB, chr_pages are 1 KB; every page holds its own index."""
+    header = bytearray(16)
+    header[:4] = b"NES\x1a"
+    header[4] = prg_pages // 2
+    header[5] = chr_pages // 8
+    header[6] = 0x40  # mapper 4
+    prg = b"".join(bytes([page]) * 0x2000 for page in range(prg_pages))
+    chr_rom = b"".join(bytes([page]) * 0x400 for page in range(chr_pages))
+    path = tmp_path / "mmc3.nes"
+    path.write_bytes(bytes(header) + prg + chr_rom)
+    cartridge = Cartridge()
+    cartridge.load(str(path))
+    return cartridge
+
+
+def select(cartridge: Cartridge, register: int, value: int, flags: int = 0) -> None:
+    cartridge.write(0x8000, register | flags)
+    cartridge.write(0x8001, value)
+
+
+def prg_pages(cartridge: Cartridge) -> tuple[int, ...]:
+    return tuple(cartridge.read(0x8000 + 0x2000 * slot, 0) for slot in range(4))
+
+
+def chr_pages(cartridge: Cartridge) -> tuple[int, ...]:
+    return tuple(cartridge.read_chr(0x400 * slot) for slot in range(8))
+
+
+def test_mmc3_powers_on_with_last_two_pages_fixed(tmp_path: Path) -> None:
+    cartridge = make_mmc3(tmp_path)
+    assert prg_pages(cartridge)[2:] == (14, 15)
+
+
+def test_mmc3_prg_modes(tmp_path: Path) -> None:
+    cartridge = make_mmc3(tmp_path)
+    select(cartridge, 6, 3)
+    select(cartridge, 7, 5)
+    assert prg_pages(cartridge) == (3, 5, 14, 15)
+
+    select(cartridge, 6, 3, flags=0x40)  # swap: R6 moves to $C000
+    select(cartridge, 7, 5, flags=0x40)
+    assert prg_pages(cartridge) == (14, 5, 3, 15)
+
+
+def test_mmc3_chr_modes(tmp_path: Path) -> None:
+    cartridge = make_mmc3(tmp_path)
+    for register, value in enumerate((10, 20, 30, 31, 32, 33)):
+        select(cartridge, register, value)
+    # R0/R1 are 2 KB banks: the low bit is ignored
+    assert chr_pages(cartridge) == (10, 11, 20, 21, 30, 31, 32, 33)
+
+    select(cartridge, 0, 10, flags=0x80)  # inverted: 1 KB banks at $0000
+    assert chr_pages(cartridge) == (30, 31, 32, 33, 10, 11, 20, 21)
+
+
+def test_mmc3_mirroring_register(tmp_path: Path) -> None:
+    cartridge = make_mmc3(tmp_path)
+    cartridge.write(0xA000, 0)
+    assert cartridge.nametable_mirroring == 1  # vertical
+    cartridge.write(0xA000, 1)
+    assert cartridge.nametable_mirroring == 0  # horizontal
+
+
+def test_mmc3_prg_ram(tmp_path: Path) -> None:
+    cartridge = make_mmc3(tmp_path)
+    cartridge.write(0x6000, 0x5A)
+    assert cartridge.read(0x6000, 0) == 0x5A
+
+
+def clock(cartridge: Cartridge, scanlines: int) -> None:
+    for _ in range(scanlines):
+        cartridge.mapper.clock_scanline()
+
+
+def test_mmc3_irq_fires_after_latch_plus_one_scanlines(tmp_path: Path) -> None:
+    cartridge = make_mmc3(tmp_path)
+    cartridge.write(0xC000, 3)  # latch
+    cartridge.write(0xC001, 0)  # reload
+    cartridge.write(0xE001, 0)  # enable
+
+    clock(cartridge, 3)
+    assert not cartridge.irq_pending
+    clock(cartridge, 1)
+    assert cartridge.irq_pending
+
+    cartridge.write(0xE000, 0)  # disable + acknowledge
+    assert not cartridge.irq_pending
+    clock(cartridge, 8)
+    assert not cartridge.irq_pending
+
+
+def test_mmc3_irq_counter_reloads_automatically(tmp_path: Path) -> None:
+    cartridge = make_mmc3(tmp_path)
+    cartridge.write(0xC000, 2)
+    cartridge.write(0xE001, 0)
+
+    clock(cartridge, 1)  # counter was 0: reloads to 2
+    clock(cartridge, 2)  # 1, 0 -> fires
+    assert cartridge.irq_pending
+    cartridge.irq_pending = False
+    clock(cartridge, 1)  # reload
+    clock(cartridge, 2)
+    assert cartridge.irq_pending
+
+
+def test_mmc3_irq_with_latch_zero_fires_every_scanline(tmp_path: Path) -> None:
+    cartridge = make_mmc3(tmp_path)
+    cartridge.write(0xC000, 0)
+    cartridge.write(0xE001, 0)
+    clock(cartridge, 1)
+    assert cartridge.irq_pending

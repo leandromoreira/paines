@@ -12,6 +12,8 @@ VBLANK_START = 241 * PPU_DOTS_PER_SCANLINE + 1
 VBLANK_END = 261 * PPU_DOTS_PER_SCANLINE + 1
 PRE_RENDER_SCROLL_COPY = 261 * PPU_DOTS_PER_SCANLINE + 280
 LINE_RENDER_DOT = 256
+# Sprite fetches raise PPU address line A12 around here; MMC3 counts those edges.
+MAPPER_CLOCK_DOT = 260
 
 # Positions in a frame where the PPU does something observable.
 _EVENTS: tuple[tuple[int, int], ...] = tuple(
@@ -22,6 +24,7 @@ _EVENTS: tuple[tuple[int, int], ...] = tuple(
             (VBLANK_END, -2),
             (PRE_RENDER_SCROLL_COPY, -3),
         ]
+        + [(y * PPU_DOTS_PER_SCANLINE + MAPPER_CLOCK_DOT, -4) for y in (*range(FRAME_HEIGHT), 261)]
     )
 )
 _EVENT_POSITIONS = [position for position, _ in _EVENTS]
@@ -122,6 +125,9 @@ class PPU:
                 self.frame_ready = True
                 self.v_blank_status = 1
                 self._update_nmi_line()
+            elif kind == -4:
+                if self.bg_enabled or self.spr_enabled:
+                    self.bus.cartridge.mapper.clock_scanline()
             elif kind == -2:
                 self.spr_zero_hit = 0
                 self.spr_overflow = 0
