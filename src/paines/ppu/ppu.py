@@ -203,20 +203,25 @@ class PPU:
             return
 
         sprite_occupied = bytearray(FRAME_WIDTH * FRAME_HEIGHT)
+        sprites_per_scanline = [0] * FRAME_HEIGHT
         sprite_height = 16 if self.spr_size else 8
         sprite_pattern_table = self.spr_pattern_table * 0x1000
 
         for sprite_index in range(64):
             oam_index = sprite_index * 4
-            top = self.oam_memory[oam_index] + 1
+            top = (self.oam_memory[oam_index] + 1) & 0xFF
             tile = self.oam_memory[oam_index + 1]
             attributes = self.oam_memory[oam_index + 2]
             left = self.oam_memory[oam_index + 3]
 
             for sprite_y in range(sprite_height):
-                screen_y = top + sprite_y
+                screen_y = (top + sprite_y) & 0xFF
                 if screen_y >= FRAME_HEIGHT:
                     continue
+                sprites_per_scanline[screen_y] += 1
+                if sprites_per_scanline[screen_y] > 8:
+                    self.spr_overflow = 1
+
                 pattern_y = sprite_height - 1 - sprite_y if attributes & 0x80 else sprite_y
                 if self.spr_size:
                     pattern_table = (tile & 1) * 0x1000
