@@ -1,3 +1,9 @@
+# POC
+
+https://github.com/user-attachments/assets/ce23932e-54a3-45fd-9bc0-7d023a2a28c6
+
+# Numbers
+
 1.789773 MHz
 
 1.789773 * 10 ^ 6
