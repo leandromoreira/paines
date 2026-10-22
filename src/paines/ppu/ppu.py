@@ -76,58 +76,62 @@ class PPU:
             nametable_y, local_tile_y = divmod(tile_y, 30)
             nametable_row = (nametable >> 1) ^ nametable_y
             nametable_row &= 1
-            local_y = pixel_y
-            cached_tile: tuple[int, int, int] | None = None
+            world_x = coarse_x * 8 + fine_x
+            screen_x = 0
 
-            for screen_x in range(FRAME_WIDTH):
-                world_x = (coarse_x * 8 + fine_x + screen_x) % (2 * FRAME_WIDTH)
+            while screen_x < FRAME_WIDTH:
+                world_x %= 2 * FRAME_WIDTH
                 tile_x, pixel_x = divmod(world_x, 8)
                 nametable_x, local_tile_x = divmod(tile_x, 32)
                 nametable_column = (nametable & 1) ^ nametable_x
                 nametable_column &= 1
                 table_index = nametable_row * 2 + nametable_column
-                tile_key = (table_index, local_tile_y, local_tile_x)
-                if tile_key != cached_tile:
-                    table_address = 0x2000 + table_index * 0x400
-                    tile_address = table_address + local_tile_y * 32 + local_tile_x
-                    tile_index = self.read_vram(tile_address)
-                    attribute_address = (
-                        table_address
-                        + 0x3C0
-                        + (local_tile_y // 4) * 8
-                        + (local_tile_x // 4)
-                    )
-                    attribute = self.read_vram(attribute_address)
-                    palette_shift = (
-                        ((local_tile_y % 4) // 2) * 4
-                        + ((local_tile_x % 4) // 2) * 2
-                    )
-                    palette = (attribute >> palette_shift) & 0b11
-                    pattern_address = (
-                        pattern_table_address + tile_index * 16 + local_y
-                    )
-                    low_plane = self.read_vram(pattern_address)
-                    high_plane = self.read_vram(pattern_address + 8)
-                    palette_address = 0x3F00 + palette * 4
-                    palette_colors = (
-                        universal_color,
-                        self.read_vram(palette_address + 1),
-                        self.read_vram(palette_address + 2),
-                        self.read_vram(palette_address + 3),
-                    )
-                    cached_tile = tile_key
-
-                bit = 7 - pixel_x
-                pixel = ((low_plane >> bit) & 1) | (
-                    ((high_plane >> bit) & 1) << 1
+                table_address = 0x2000 + table_index * 0x400
+                tile_address = table_address + local_tile_y * 32 + local_tile_x
+                tile_index = self.read_vram(tile_address)
+                attribute_address = (
+                    table_address
+                    + 0x3C0
+                    + (local_tile_y // 4) * 8
+                    + (local_tile_x // 4)
+                )
+                attribute = self.read_vram(attribute_address)
+                palette_shift = (
+                    ((local_tile_y % 4) // 2) * 4
+                    + ((local_tile_x % 4) // 2) * 2
+                )
+                palette = (attribute >> palette_shift) & 0b11
+                pattern_address = (
+                    pattern_table_address + tile_index * 16 + pixel_y
+                )
+                low_plane = self.read_vram(pattern_address)
+                high_plane = self.read_vram(pattern_address + 8)
+                palette_address = 0x3F00 + palette * 4
+                palette_colors = (
+                    universal_color,
+                    self.read_vram(palette_address + 1),
+                    self.read_vram(palette_address + 2),
+                    self.read_vram(palette_address + 3),
                 )
 
-                if pixel == 0 or (screen_x < 8 and not self.show_bg_leftmost):
-                    color = universal_color
-                else:
-                    color = palette_colors[pixel]
+                tile_span = min(8 - pixel_x, FRAME_WIDTH - screen_x)
+                for offset in range(tile_span):
+                    bit = 7 - (pixel_x + offset)
+                    pixel = ((low_plane >> bit) & 1) | (
+                        ((high_plane >> bit) & 1) << 1
+                    )
+                    if pixel == 0 or (
+                        screen_x + offset < 8 and not self.show_bg_leftmost
+                    ):
+                        color = universal_color
+                    else:
+                        color = palette_colors[pixel]
+                    self.frame_buffer[
+                        screen_y * FRAME_WIDTH + screen_x + offset
+                    ] = color
 
-                self.frame_buffer[screen_y * FRAME_WIDTH + screen_x] = color
+                screen_x += tile_span
+                world_x += tile_span
 
         return self.frame_buffer
 
