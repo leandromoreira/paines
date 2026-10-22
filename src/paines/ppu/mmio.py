@@ -8,6 +8,7 @@ class PPUMMIO:
         self.open_bus: U8 = 0x0
 
     def write(self, address: U16, value: U8) -> None:
+        self.ppu.flush()
         address = 0x2000 + (address % 8)
         self.open_bus = value
 
@@ -61,6 +62,7 @@ class PPUMMIO:
             self._write_vram_data(value)
 
     def read(self, address: U16) -> U8:
+        self.ppu.flush()
         address = 0x2000 + (address % 8)
 
         if address == 0x2002:

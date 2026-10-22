@@ -39,8 +39,8 @@ class PPU:
         self.v_blank_enabled: U1 = 0
         self.nmi_pending: bool = False
         self._nmi_line: bool = False
-        self.scanline = 261
-        self.dot = 0
+        self._scanline = 261
+        self._dot = 0
         self.leader: U1 = 0
         self.spr_size: U1 = 0
         self.bg_pattern_table: U1 = 0
@@ -78,7 +78,34 @@ class PPU:
         self.frame_ready = False
         self.dots_before_read = 0
         self.dots_already_advanced = 0
+        # Dots the CPU has run that the PPU has not simulated yet. Nothing observable happens
+        # until the next event, so they are batched and applied by flush().
+        self.pending_dots = 0
+        self.dots_to_event = 0
         self._tile_rows: dict[int, bytes] = {}
+        self.advance_dots(0)
+
+    @property
+    def scanline(self) -> int:
+        self.flush()
+        return self._scanline
+
+    @scanline.setter
+    def scanline(self, value: int) -> None:
+        self.flush()
+        self._scanline = value
+        self.advance_dots(0)
+
+    @property
+    def dot(self) -> int:
+        self.flush()
+        return self._dot
+
+    @dot.setter
+    def dot(self, value: int) -> None:
+        self.flush()
+        self._dot = value
+        self.advance_dots(0)
 
     def write_oam(self, value: U8) -> None:
         self.oam_memory[self.oam_address] = value
@@ -94,17 +121,31 @@ class PPU:
         return self.bus.read(address)
 
     def catch_up_for_read(self) -> None:
+        self.flush()
         dots = self.dots_before_read
         if dots:
             self.dots_before_read = 0
             self.dots_already_advanced += dots
             self.advance_dots(dots)
 
+    def flush(self) -> None:
+        """Brings the PPU up to date; call before anything reads or changes PPU state."""
+        dots = self.pending_dots
+        if dots:
+            self.pending_dots = 0
+            self.advance_dots(dots)
+
+    def defer_dots(self, dots: int) -> None:
+        self.pending_dots += dots
+        if self.pending_dots >= self.dots_to_event:
+            self.flush()
+
     def advance_cpu_cycles(self, cycles: int) -> None:
+        self.flush()
         self.advance_dots(cycles * 3)
 
     def advance_dots(self, dots: int) -> None:
-        position = self.scanline * PPU_DOTS_PER_SCANLINE + self.dot
+        position = self._scanline * PPU_DOTS_PER_SCANLINE + self._dot
         end = position + dots
 
         while True:
@@ -136,7 +177,8 @@ class PPU:
             elif self.bg_enabled or self.spr_enabled:
                 self.scroll_v = (self.scroll_v & ~0x7BFF) | (self.scroll_t & 0x7BFF)
 
-        self.scanline, self.dot = divmod(end % PPU_DOTS_PER_FRAME, PPU_DOTS_PER_SCANLINE)
+        self.dots_to_event = event_position - end
+        self._scanline, self._dot = divmod(end % PPU_DOTS_PER_FRAME, PPU_DOTS_PER_SCANLINE)
 
     def _update_nmi_line(self) -> None:
         nmi_line = bool(self.v_blank_status and self.v_blank_enabled)

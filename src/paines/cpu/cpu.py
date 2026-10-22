@@ -198,23 +198,27 @@ class CPU6502:
         return destination, actual_page_crossed
 
     def execute(self) -> U8:
-        if self.bus.ppu_mmio.ppu.take_nmi():
+        bus = self.bus
+        ppu = bus.ppu_mmio.ppu
+        apu = bus.apu
+        if ppu.nmi_pending:
+            ppu.nmi_pending = False
             cycles = self.nmi()
             self.total_cycle += cycles
-            self.bus.ppu_mmio.ppu.advance_cpu_cycles(cycles)
-            self.bus.apu.tick(cycles)
+            ppu.defer_dots(cycles * 3)
+            apu.tick(cycles)
             return cycles
 
-        if self.p_irq == 0 and (self.bus.cartridge.irq_pending or self.bus.apu.irq_pending):
+        if self.p_irq == 0 and (bus.cartridge.irq_pending or apu.irq_pending):
             cycles = self.irq()
             self.total_cycle += cycles
-            self.bus.ppu_mmio.ppu.advance_cpu_cycles(cycles)
-            self.bus.apu.tick(cycles)
+            ppu.defer_dots(cycles * 3)
+            apu.tick(cycles)
             return cycles
 
         cycles: U8 = 0
         initial_address: U16 = self.pc
-        op_code: U8 = self.bus.read(self.pc)
+        op_code: U8 = bus.read(self.pc)
         self.pc += 1
 
         instruction = self.instruction_set[op_code]
@@ -223,7 +227,6 @@ class CPU6502:
 
         operand_address = self.pc
         # A register read lands on the instruction's last cycle, so $2002 needs the PPU caught up by then.
-        ppu = self.bus.ppu_mmio.ppu
         ppu.dots_before_read = (instruction.cycles - 1) * 3
         addr, page_crossed = instruction.mode()
 
@@ -247,13 +250,12 @@ class CPU6502:
         elif allows_page_penalty and page_crossed:
             cycles += 1
 
-        cycles += self.bus.dma_stall_cycles
-        self.bus.dma_stall_cycles = 0
+        cycles += bus.dma_stall_cycles
+        bus.dma_stall_cycles = 0
         self.total_cycle += cycles
         ppu.dots_before_read = 0
-        ppu.advance_dots(cycles * 3 - ppu.dots_already_advanced)
+        ppu.defer_dots(cycles * 3 - ppu.dots_already_advanced)
         ppu.dots_already_advanced = 0
-        apu = self.bus.apu
         apu._pending += cycles
         if apu._pending >= apu._threshold:
             apu._process()

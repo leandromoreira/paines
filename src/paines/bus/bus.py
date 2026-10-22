@@ -40,6 +40,7 @@ class CPUBus:
     def _oam_dma(self, page: U8) -> None:
         base = page << 8
         ppu = self.ppu_mmio.ppu
+        ppu.flush()
         for i in range(256):
             ppu.oam_memory[(ppu.oam_address + i) & 0xFF] = self.read(base + i)
         self.dma_stall_cycles += 513
@@ -117,6 +118,8 @@ class CPUBus:
             return
 
         if address >= 0x4018 and address <= 0xFFFF:
+            if address >= 0x8000:
+                self.ppu_mmio.ppu.flush()  # mapper registers change what the PPU renders
             self.cartridge.write(address, value)
             return
 
