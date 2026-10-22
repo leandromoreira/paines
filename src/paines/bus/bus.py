@@ -30,6 +30,24 @@ class CPUBus:
             ppu = ppu_builder(bus=ppu_bus_builder(cartridge=self.cartridge))
             ppu_mmio = ppu_mmio_builder(ppu)
         self.ppu_mmio = ppu_mmio
+        self.controller_buttons: list[U8] = [0, 0]  # A,B,Select,Start,Up,Down,Left,Right = bits 0-7
+        self._controller_shift: list[U8] = [0, 0]
+        self._controller_strobe = False
+        self.dma_stall_cycles = 0
+
+    def _oam_dma(self, page: U8) -> None:
+        base = page << 8
+        ppu = self.ppu_mmio.ppu
+        for i in range(256):
+            ppu.oam_memory[(ppu.oam_address + i) & 0xFF] = self.read(base + i)
+        self.dma_stall_cycles += 513
+
+    def _read_controller(self, index: int) -> U8:
+        if self._controller_strobe:
+            return 0x40 | (self.controller_buttons[index] & 1)
+        bit = self._controller_shift[index] & 1
+        self._controller_shift[index] = (self._controller_shift[index] >> 1) | 0x80
+        return 0x40 | bit
 
     def read(self, address: U16) -> U8:
         if address <= 0x1FFF:
@@ -38,6 +56,10 @@ class CPUBus:
 
         if address >= 0x2000 and address <= 0x3FFF:
             self.open_bus = self.ppu_mmio.read(address)
+            return self.open_bus
+
+        if address == 0x4016 or address == 0x4017:
+            self.open_bus = self._read_controller(address - 0x4016)
             return self.open_bus
 
         if address >= 0x4018 and address <= 0xFFFF:
@@ -65,6 +87,19 @@ class CPUBus:
 
         if address >= 0x2000 and address <= 0x3FFF:
             self.ppu_mmio.write(address, value)
+            return
+
+        if address == 0x4014:
+            self._oam_dma(value)
+            return
+
+        if address == 0x4016:
+            strobe = bool(value & 1)
+            if self._controller_strobe and not strobe:
+                self._controller_shift = list(self.controller_buttons)
+            self._controller_strobe = strobe
+            if strobe:
+                self._controller_shift = list(self.controller_buttons)
             return
 
         if address >= 0x4018 and address <= 0xFFFF:

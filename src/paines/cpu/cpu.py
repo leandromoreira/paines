@@ -236,6 +236,8 @@ class CPU6502:
         elif allows_page_penalty and page_crossed:
             cycles += 1
 
+        cycles += self.bus.dma_stall_cycles
+        self.bus.dma_stall_cycles = 0
         self.total_cycle += cycles
         self.bus.ppu_mmio.ppu.advance_cpu_cycles(cycles)
         return cycles
