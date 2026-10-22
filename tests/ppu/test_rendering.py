@@ -133,3 +133,31 @@ def test_control_register_selects_renderer_nametable() -> None:
     frame = ppu.render_background()
 
     assert frame[0] == 0x2A
+
+
+def test_grayscale_masks_background_palette_to_two_high_bits() -> None:
+    ppu = PPU()
+    ppu.bg_enabled = 1
+    ppu.show_bg_leftmost = 1
+    ppu.grayscale = 1
+    ppu.write_vram(0x2000, 1)
+    ppu.write_vram(0x0010, 0xFF)
+    ppu.write_vram(0x3F01, 0x2D)
+
+    frame = ppu.render_background()
+
+    assert frame[0] == 0x20
+
+
+def test_grayscale_masks_sprite_palette() -> None:
+    ppu = PPU()
+    ppu.spr_enabled = 1
+    ppu.show_spr_leftmost = 1
+    ppu.grayscale = 1
+    ppu.oam_memory[:4] = bytes((9, 1, 0, 12))
+    ppu.write_vram(0x0010, 0x80)
+    ppu.write_vram(0x3F11, 0x2D)
+
+    frame = ppu.render_background()
+
+    assert frame[10 * 256 + 12] == 0x20

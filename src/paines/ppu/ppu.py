@@ -115,7 +115,8 @@ class PPU:
         return self.frame_buffer
 
     def render_background(self) -> bytearray:
-        universal_color = self.read_vram(0x3F00)
+        color_mask = 0x30 if self.grayscale else 0x3F
+        universal_color = self.read_vram(0x3F00) & color_mask
 
         if not self.bg_enabled:
             self.frame_buffer[:] = bytes([universal_color]) * len(self.frame_buffer)
@@ -169,9 +170,9 @@ class PPU:
                 palette_address = 0x3F00 + palette * 4
                 palette_colors = (
                     universal_color,
-                    self.read_vram(palette_address + 1),
-                    self.read_vram(palette_address + 2),
-                    self.read_vram(palette_address + 3),
+                    self.read_vram(palette_address + 1) & color_mask,
+                    self.read_vram(palette_address + 2) & color_mask,
+                    self.read_vram(palette_address + 3) & color_mask,
                 )
 
                 tile_span = min(8 - pixel_x, FRAME_WIDTH - screen_x)
@@ -264,7 +265,10 @@ class PPU:
                         continue
 
                     palette_address = 0x3F10 + (attributes & 0x03) * 4 + pixel
-                    self.frame_buffer[frame_index] = self.read_vram(palette_address)
+                    color_mask = 0x30 if self.grayscale else 0x3F
+                    self.frame_buffer[frame_index] = (
+                        self.read_vram(palette_address) & color_mask
+                    )
 
 
 def ppu_builder(bus: PPUBus | None = None) -> PPU:
