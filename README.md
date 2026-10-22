@@ -57,7 +57,7 @@ Real time / NES CPU Cycles   : 0.001216 ms
 
 ## Dumping a frame
 
-The current background renderer can produce a PPM preview from mapper-0 iNES
+The current background renderer can produce a PPM preview from iNES
 ROMs:
 
 ```sh
@@ -71,10 +71,19 @@ effects, so this is an early preview rather than a complete game image.
 
 ## Playing a ROM
 
-Mapper 0 ROMs can be played in a window (requires the optional `pygame-ce` dependency):
+ROMs using mappers 0 (NROM), 1 (MMC1), 2 (UxROM) and 3 (CNROM) can be played in a window (requires the optional `pygame-ce` dependency):
 
 ```sh
 uv run --extra play paines play path/to/game.nes --scale 3
 ```
 
 Controls: arrows = D-pad, `X` = A, `Z` = B, `Enter` = Start, `Right Shift` = Select, `Esc` = quit.
+
+## Tracking what works
+
+`capture_frames.py` runs every supported ROM in the given folders (tapping Start every 50 frames),
+and saves the last frame of each to `frames/` as a PPM:
+
+```sh
+uv run python capture_frames.py "path/to/roms" tests/cartridge/zelda
+```
