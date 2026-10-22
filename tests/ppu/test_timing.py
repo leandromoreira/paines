@@ -35,6 +35,8 @@ def test_vblank_starts_and_raises_nmi_when_enabled() -> None:
 def test_vblank_ends_at_pre_render_scanline() -> None:
     ppu = PPU()
     ppu.v_blank_status = 1
+    ppu.spr_zero_hit = 1
+    ppu.spr_overflow = 1
     ppu._update_nmi_line()
     dots_until_end = (
         VBLANK_END - (ppu.scanline * PPU_DOTS_PER_SCANLINE + ppu.dot)
@@ -43,6 +45,8 @@ def test_vblank_ends_at_pre_render_scanline() -> None:
     ppu.advance_dots(dots_until_end)
 
     assert ppu.v_blank_status == 0
+    assert ppu.spr_zero_hit == 0
+    assert ppu.spr_overflow == 0
     assert (ppu.scanline, ppu.dot) == (261, 1)
 
 

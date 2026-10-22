@@ -51,6 +51,7 @@ class PPU:
         self.read_buffer: U8 = 0x0
         self.bus = bus if bus is not None else ppu_bus_builder()
         self.frame_buffer = bytearray(FRAME_WIDTH * FRAME_HEIGHT)
+        self._background_opaque = bytearray(FRAME_WIDTH * FRAME_HEIGHT)
         self.frame_ready = False
 
     def write_oam(self, value: U8) -> None:
@@ -87,6 +88,9 @@ class PPU:
             if position == VBLANK_START:
                 self.frame_ready = True
                 self.render_background()
+            else:
+                self.spr_zero_hit = 0
+                self.spr_overflow = 0
             self.v_blank_status = int(position == VBLANK_START)
             self._update_nmi_line()
 
@@ -115,6 +119,8 @@ class PPU:
 
         if not self.bg_enabled:
             self.frame_buffer[:] = bytes([universal_color]) * len(self.frame_buffer)
+            self._background_opaque[:] = bytes(len(self._background_opaque))
+            self.render_sprites()
             return self.frame_buffer
 
         pattern_table_address: U16 = self.bg_pattern_table * 0x1000
@@ -178,16 +184,82 @@ class PPU:
                         screen_x + offset < 8 and not self.show_bg_leftmost
                     ):
                         color = universal_color
+                        opaque = 0
                     else:
                         color = palette_colors[pixel]
-                    self.frame_buffer[
-                        screen_y * FRAME_WIDTH + screen_x + offset
-                    ] = color
+                        opaque = 1
+                    frame_index = screen_y * FRAME_WIDTH + screen_x + offset
+                    self.frame_buffer[frame_index] = color
+                    self._background_opaque[frame_index] = opaque
 
                 screen_x += tile_span
                 world_x += tile_span
 
+        self.render_sprites()
         return self.frame_buffer
+
+    def render_sprites(self) -> None:
+        if not self.spr_enabled:
+            return
+
+        sprite_occupied = bytearray(FRAME_WIDTH * FRAME_HEIGHT)
+        sprite_height = 16 if self.spr_size else 8
+        sprite_pattern_table = self.spr_pattern_table * 0x1000
+
+        for sprite_index in range(64):
+            oam_index = sprite_index * 4
+            top = self.oam_memory[oam_index] + 1
+            tile = self.oam_memory[oam_index + 1]
+            attributes = self.oam_memory[oam_index + 2]
+            left = self.oam_memory[oam_index + 3]
+
+            for sprite_y in range(sprite_height):
+                screen_y = top + sprite_y
+                if screen_y >= FRAME_HEIGHT:
+                    continue
+                pattern_y = sprite_height - 1 - sprite_y if attributes & 0x80 else sprite_y
+                if self.spr_size:
+                    pattern_table = (tile & 1) * 0x1000
+                    tile_index = (tile & 0xFE) + pattern_y // 8
+                    row = pattern_y % 8
+                else:
+                    pattern_table = sprite_pattern_table
+                    tile_index = tile
+                    row = pattern_y
+
+                pattern_address = pattern_table + tile_index * 16 + row
+                low_plane = self.read_vram(pattern_address)
+                high_plane = self.read_vram(pattern_address + 8)
+
+                for sprite_x in range(8):
+                    screen_x = left + sprite_x
+                    if screen_x >= FRAME_WIDTH:
+                        continue
+                    if screen_x < 8 and not self.show_spr_leftmost:
+                        continue
+
+                    pattern_x = 7 - sprite_x if attributes & 0x40 else sprite_x
+                    bit = 7 - pattern_x
+                    pixel = ((low_plane >> bit) & 1) | (
+                        ((high_plane >> bit) & 1) << 1
+                    )
+                    if pixel == 0:
+                        continue
+
+                    frame_index = screen_y * FRAME_WIDTH + screen_x
+                    if sprite_index == 0 and screen_x < 255 and self.bg_enabled:
+                        if self._background_opaque[frame_index]:
+                            self.spr_zero_hit = 1
+
+                    if sprite_occupied[frame_index]:
+                        continue
+                    sprite_occupied[frame_index] = 1
+
+                    if attributes & 0x20 and self._background_opaque[frame_index]:
+                        continue
+
+                    palette_address = 0x3F10 + (attributes & 0x03) * 4 + pixel
+                    self.frame_buffer[frame_index] = self.read_vram(palette_address)
 
 
 def ppu_builder(bus: PPUBus | None = None) -> PPU:
