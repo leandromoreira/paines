@@ -64,6 +64,7 @@ class PPUMMIO:
         address = 0x2000 + (address % 8)
 
         if address == 0x2002:
+            self.ppu.catch_up_for_read()
             self.ppu.write_toggle = 0
             value: U8 = (
                 (self.ppu.v_blank_status << 7)

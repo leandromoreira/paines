@@ -73,6 +73,8 @@ class PPU:
         self.frame_buffer = bytearray(FRAME_WIDTH * FRAME_HEIGHT)
         self._background_opaque = bytearray(FRAME_WIDTH * FRAME_HEIGHT)
         self.frame_ready = False
+        self.dots_before_read = 0
+        self.dots_already_advanced = 0
         self._tile_rows: dict[int, bytes] = {}
 
     def write_oam(self, value: U8) -> None:
@@ -87,6 +89,13 @@ class PPU:
 
     def read_vram(self, address: U16) -> U8:
         return self.bus.read(address)
+
+    def catch_up_for_read(self) -> None:
+        dots = self.dots_before_read
+        if dots:
+            self.dots_before_read = 0
+            self.dots_already_advanced += dots
+            self.advance_dots(dots)
 
     def advance_cpu_cycles(self, cycles: int) -> None:
         self.advance_dots(cycles * 3)

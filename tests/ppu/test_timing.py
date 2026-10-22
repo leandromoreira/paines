@@ -171,3 +171,20 @@ def test_scroll_written_mid_frame_applies_to_later_scanlines() -> None:
 
     assert ppu.frame_buffer[10 * 256 + 0] == 0
     assert ppu.frame_buffer[25 * 256 + 0] == 0x16
+
+
+def test_status_read_sees_vblank_that_starts_during_the_instruction(tmp_path) -> None:
+    bus = CPUBus()
+    bus.cartridge.prg = bytearray(0x8000)
+    bus.cartridge.prg_offsets = [0, 0x4000]
+    bus.cartridge.prg[0:3] = b"\xad\x02\x20"  # LDA $2002 (4 cycles, reads on the last one)
+    ppu = bus.ppu_mmio.ppu
+    ppu.scanline, ppu.dot = 241, 0  # vblank starts 1 dot in, well before the read
+    cpu = CPU6502(bus=bus, file_name=str(tmp_path / "cpu.log"))
+    cpu.pc = 0x8000
+
+    cpu.execute()
+
+    assert cpu.a & 0x80
+    assert ppu.v_blank_status == 0
+    assert (ppu.scanline, ppu.dot) == (241, 12)

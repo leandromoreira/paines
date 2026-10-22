@@ -214,6 +214,9 @@ class CPU6502:
             raise NotImplementedError(f"Opcode {hex(op_code)} not implemented!")
 
         operand_address = self.pc
+        # A register read lands on the instruction's last cycle, so $2002 needs the PPU caught up by then.
+        ppu = self.bus.ppu_mmio.ppu
+        ppu.dots_before_read = (instruction.cycles - 1) * 3
         addr, page_crossed = instruction.mode()
 
         if self.debug:
@@ -239,7 +242,9 @@ class CPU6502:
         cycles += self.bus.dma_stall_cycles
         self.bus.dma_stall_cycles = 0
         self.total_cycle += cycles
-        self.bus.ppu_mmio.ppu.advance_cpu_cycles(cycles)
+        ppu.dots_before_read = 0
+        ppu.advance_dots(cycles * 3 - ppu.dots_already_advanced)
+        ppu.dots_already_advanced = 0
         return cycles
 
     def run_frame(self) -> bytearray:
