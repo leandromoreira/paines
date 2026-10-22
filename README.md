@@ -85,6 +85,30 @@ frame counter with its IRQ, and the nonlinear mixer. Channels are advanced
 arithmetically right before each output sample rather than every CPU cycle. If no audio
 device is available, the game runs silently.
 
+## Half human, half AI
+
+This project is a deliberate mix. The CPU was written by hand, one opcode at a time, and
+verified against `nestest`. Everything that makes it a *console* (picture, sound, input,
+mappers, window) was built later with GitHub Copilot, with me steering, reviewing and testing.
+
+By surviving lines of Python (`git blame`; "AI" = commits co-authored by Copilot):
+
+| Component | What it does | Human | AI |
+|---|---|---|---|
+| `cpu/` | 6502 core, all official opcodes, NMI/IRQ, nestest trace | 97% | 3% |
+| `ram/`, `types.py` | work RAM and shared types | ~90% | ~10% |
+| `bus/` | CPU memory map, controllers, OAM DMA | 30% | 70% |
+| `cartridge/` | iNES loader, NROM/MMC1/UxROM/CNROM/MMC3 mappers | 16% | 84% |
+| `ppu/` | scrolling, backgrounds, sprites, event-driven timing | 0% | 100% |
+| `apu/` | pulse, triangle, noise, DMC, frame counter, mixer | 0% | 100% |
+| `frontend.py` | pygame window, input polling, audio buffer | 0% | 100% |
+| `tests/` | unit tests per component | 50% | 50% |
+| **Total** | | **~48%** | **~52%** |
+
+Roughly: **I wrote the CPU, Copilot wrote the rest**, and the tests are split down the middle.
+Line counts are only a rough measure. Surviving lines favor whoever touched a file last, and
+"AI" lines still went through my prompts, review and play-testing.
+
 ## Tracking what works
 
 `capture_frames.py` runs every supported ROM in the given folders (tapping Start every 50 frames),
