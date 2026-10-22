@@ -27,6 +27,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     play_command = commands.add_parser("play", help="play a ROM in a window")
     play_command.add_argument("rom", type=Path)
     play_command.add_argument("--scale", type=int, default=3)
+    play_command.add_argument("--crt", action="store_true", help="add scanlines, phosphor mask and vignette")
+    play_command.add_argument(
+        "--signal", choices=("rgb", "composite", "rf"), default="rgb", help="analog signal look used with --crt"
+    )
     args = parser.parse_args(argv)
     if args.command == "play":
         args.skip_frames = 0
@@ -53,7 +57,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         if args.command == "play":
             from paines.frontend import play
 
-            play(cpu, scale=args.scale)
+            play(cpu, scale=args.scale, crt=args.crt, signal=args.signal)
             return
         for _ in range(args.skip_frames):
             cpu.run_frame()

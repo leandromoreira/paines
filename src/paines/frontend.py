@@ -12,6 +12,9 @@ AUDIO_CHUNK_SAMPLES = 512
 TARGET_BUFFER_SAMPLES = 2048
 MAX_BUFFER_SAMPLES = 8192
 BUFFER_CORRECTION = 0.02
+CRT_SCANLINE_DEPTH = 0.45
+CRT_MASK_FLOOR = 200
+CRT_VIGNETTE = 0.35
 
 # Bit order matches the controller shift register: A, B, Select, Start, Up, Down, Left, Right
 def _buttons():
@@ -136,16 +139,70 @@ def _queue_audio(cpu: CPU6502, buffer: AudioBuffer | None, frame_period: float) 
         buffer.push(resample(data, audio_target_length(frame_period, buffer.samples)))
 
 
-def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True) -> None:
+def build_crt_overlay(pygame, size: tuple[int, int], scale: int):
+    """Multiply-blend layer with scanlines, an RGB phosphor mask and a soft vignette.
+
+    It is built once; each frame costs a single BLEND_MULT blit.
+    """
+    width, height = size
+    overlay = pygame.Surface(size)
+    overlay.fill((255, 255, 255))
+    for y in range(height):
+        # Brightest at the middle of each source pixel row, darkest at the seam between rows.
+        phase = ((y % scale) + 0.5) / scale
+        level = 1 - CRT_SCANLINE_DEPTH * (2 * abs(phase - 0.5)) ** 2
+        shade = int(255 * level)
+        pygame.draw.line(overlay, (shade, shade, shade), (0, y), (width, y))
+
+    mask = pygame.Surface(size)
+    tints = ((255, CRT_MASK_FLOOR, CRT_MASK_FLOOR), (CRT_MASK_FLOOR, 255, CRT_MASK_FLOOR),
+             (CRT_MASK_FLOOR, CRT_MASK_FLOOR, 255))  # fmt: skip
+    for x in range(width):
+        pygame.draw.line(mask, tints[x % 3], (x, 0), (x, height))
+    overlay.blit(mask, (0, 0), special_flags=pygame.BLEND_MULT)
+
+    vignette = pygame.Surface((64, 48))
+    for y in range(48):
+        for x in range(64):
+            dx, dy = (x - 31.5) / 32, (y - 23.5) / 24
+            level = 1 - CRT_VIGNETTE * min(1.0, (dx * dx + dy * dy) / 2) ** 1.5
+            shade = int(255 * level)
+            vignette.set_at((x, y), (shade, shade, shade))
+    overlay.blit(pygame.transform.smoothscale(vignette, size), (0, 0), special_flags=pygame.BLEND_MULT)
+    return overlay.convert()
+
+
+def _open_shader_window(pygame, size: tuple[int, int], signal: str = "rgb"):
+    """Open an OpenGL window and return a CRTShader, or None if moderngl/GL is unavailable."""
+    try:
+        import moderngl
+
+        from paines.crt_shader import CRTShader
+
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_FORWARD_COMPATIBLE_FLAG, 1)
+        pygame.display.set_mode(size, pygame.OPENGL | pygame.DOUBLEBUF)
+        return CRTShader(moderngl.create_context(), size, signal)
+    except Exception as error:
+        print(f"CRT shader unavailable ({error}); using the software overlay")
+        return None
+
+
+def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True, crt: bool = False, signal: str = "rgb") -> None:
     import pygame
 
     pygame.init()
-    window = pygame.display.set_mode((FRAME_WIDTH * scale, FRAME_HEIGHT * scale))
+    size = (FRAME_WIDTH * scale, FRAME_HEIGHT * scale)
+    shader = _open_shader_window(pygame, size, signal) if crt else None
+    window = None if shader else pygame.display.set_mode(size)
     pygame.display.set_caption("paines")
     palette = [tuple(color) for color in NES_PALETTE]
     key_map = _buttons()
     held = ""
     audio_device, audio_buffer = _start_audio(pygame, cpu)
+    overlay = build_crt_overlay(pygame, window.get_size(), scale) if crt and window else None
     frames = 0
     fps_start = time.perf_counter()
     next_frame = fps_start
@@ -174,9 +231,14 @@ def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True) -> None:
             frame_period += (max(frame_started - last_frame, FRAME_SECONDS) - frame_period) * 0.1
             last_frame = frame_started
             _queue_audio(cpu, audio_buffer, frame_period)
-            surface = pygame.image.frombuffer(bytes(frame), (FRAME_WIDTH, FRAME_HEIGHT), "P")
-            surface.set_palette(palette)
-            pygame.transform.scale(surface.convert(window), window.get_size(), window)
+            if shader is not None:
+                shader.draw(bytes(frame))
+            else:
+                surface = pygame.image.frombuffer(bytes(frame), (FRAME_WIDTH, FRAME_HEIGHT), "P")
+                surface.set_palette(palette)
+                pygame.transform.scale(surface.convert(window), window.get_size(), window)
+                if overlay is not None:
+                    window.blit(overlay, (0, 0), special_flags=pygame.BLEND_MULT)
             pygame.display.flip()
 
             frames += 1

@@ -15,6 +15,7 @@ paines = "paines:main"
 [project.optional-dependencies]
 play = [
     "pygame-ce>=2.5.8",
+    "moderngl>=5.12",
 ]
 
 [build-system]
