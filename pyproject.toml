@@ -12,6 +12,11 @@ dependencies = []
 [project.scripts]
 paines = "paines:main"
 
+[project.optional-dependencies]
+play = [
+    "pygame-ce>=2.5.8",
+]
+
 [build-system]
 requires = ["uv_build>=0.11.19,<0.12.0"]
 build-backend = "uv_build"

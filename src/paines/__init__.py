@@ -23,7 +23,12 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=4,
         help="number of startup frames to run before saving (default: 4)",
     )
+    play_command = commands.add_parser("play", help="play a mapper-0 ROM in a window")
+    play_command.add_argument("rom", type=Path)
+    play_command.add_argument("--scale", type=int, default=3)
     args = parser.parse_args(argv)
+    if args.command == "play":
+        args.skip_frames = 0
     if args.skip_frames < 0:
         parser.error("--skip-frames must be non-negative")
 
@@ -44,6 +49,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     cpu = CPU6502(bus=bus, file_name=devnull)
     try:
         cpu.reset()
+        if args.command == "play":
+            from paines.frontend import play
+
+            play(cpu, scale=args.scale)
+            return
         for _ in range(args.skip_frames):
             cpu.run_frame()
         frame = cpu.run_frame()

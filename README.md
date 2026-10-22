@@ -68,3 +68,13 @@ The command skips four startup frames by default; use `--skip-frames 0` to
 capture the first frame or provide a different non-negative count. The renderer
 currently draws backgrounds and basic sprites, without scanline-accurate
 effects, so this is an early preview rather than a complete game image.
+
+## Playing a ROM
+
+Mapper 0 ROMs can be played in a window (requires the optional `pygame-ce` dependency):
+
+```sh
+uv run --extra play paines play path/to/game.nes --scale 3
+```
+
+Controls: arrows = D-pad, `X` = A, `Z` = B, `Enter` = Start, `Right Shift` = Select, `Esc` = quit.
