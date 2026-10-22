@@ -79,6 +79,12 @@ uv run --extra play paines play path/to/game.nes --scale 3
 
 Controls: arrows = D-pad, `X` = A, `Z` = B, `Enter` = Start, `Right Shift` = Select, `Esc` = quit.
 
+Audio is played through pygame's mixer (44.1 kHz mono). The APU (`src/paines/apu/`)
+implements both pulse channels (envelope, sweep, length), triangle, noise, DMC, the
+frame counter with its IRQ, and the nonlinear mixer. Channels are advanced
+arithmetically right before each output sample rather than every CPU cycle. If no audio
+device is available, the game runs silently.
+
 ## Tracking what works
 
 `capture_frames.py` runs every supported ROM in the given folders (tapping Start every 50 frames),

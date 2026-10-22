@@ -1,3 +1,4 @@
+from paines.apu.apu import APU
 from paines.cartridge.cartridge import Cartridge, cartridge_builder
 from paines.bus.ppu import ppu_bus_builder
 from paines.ppu.mmio import PPUMMIO, ppu_mmio_builder
@@ -34,6 +35,7 @@ class CPUBus:
         self._controller_shift: list[U8] = [0, 0]
         self._controller_strobe = False
         self.dma_stall_cycles = 0
+        self.apu = APU(read_memory=self.read)
 
     def _oam_dma(self, page: U8) -> None:
         base = page << 8
@@ -56,6 +58,10 @@ class CPUBus:
 
         if address >= 0x2000 and address <= 0x3FFF:
             self.open_bus = self.ppu_mmio.read(address)
+            return self.open_bus
+
+        if address == 0x4015:
+            self.open_bus = self.apu.read_status()
             return self.open_bus
 
         if address == 0x4016 or address == 0x4017:
@@ -93,6 +99,10 @@ class CPUBus:
             self._oam_dma(value)
             return
 
+        if 0x4000 <= address <= 0x4013 or address == 0x4015:
+            self.apu.write(address, value)
+            return
+
         if address == 0x4016:
             strobe = bool(value & 1)
             if self._controller_strobe and not strobe:
@@ -100,6 +110,10 @@ class CPUBus:
             self._controller_strobe = strobe
             if strobe:
                 self._controller_shift = list(self.controller_buttons)
+            return
+
+        if address == 0x4017:
+            self.apu.write(address, value)
             return
 
         if address >= 0x4018 and address <= 0xFFFF:

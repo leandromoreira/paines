@@ -202,12 +202,14 @@ class CPU6502:
             cycles = self.nmi()
             self.total_cycle += cycles
             self.bus.ppu_mmio.ppu.advance_cpu_cycles(cycles)
+            self.bus.apu.tick(cycles)
             return cycles
 
-        if self.p_irq == 0 and self.bus.cartridge.irq_pending:
+        if self.p_irq == 0 and (self.bus.cartridge.irq_pending or self.bus.apu.irq_pending):
             cycles = self.irq()
             self.total_cycle += cycles
             self.bus.ppu_mmio.ppu.advance_cpu_cycles(cycles)
+            self.bus.apu.tick(cycles)
             return cycles
 
         cycles: U8 = 0
@@ -251,6 +253,10 @@ class CPU6502:
         ppu.dots_before_read = 0
         ppu.advance_dots(cycles * 3 - ppu.dots_already_advanced)
         ppu.dots_already_advanced = 0
+        apu = self.bus.apu
+        apu._pending += cycles
+        if apu._pending >= apu._threshold:
+            apu._process()
         return cycles
 
     def run_frame(self) -> bytearray:

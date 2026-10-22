@@ -1,10 +1,12 @@
 import time
 
+from paines.apu.apu import SAMPLE_RATE
 from paines.cpu.cpu import CPU6502
 from paines.ppu.frame import NES_PALETTE
 from paines.ppu.ppu import FRAME_HEIGHT, FRAME_WIDTH
 
 FRAME_SECONDS = 1 / 60
+MAX_QUEUED_CHUNKS = 6
 
 # Bit order matches the controller shift register: A, B, Select, Start, Up, Down, Left, Right
 def _buttons():
@@ -23,6 +25,29 @@ def _buttons():
     )
 
 
+def _start_audio(pygame, cpu: CPU6502):
+    try:
+        pygame.mixer.init(frequency=SAMPLE_RATE, size=-16, channels=1, buffer=1024)
+    except pygame.error:
+        return None, []
+    cpu.bus.apu.output_enabled = True
+    return pygame.mixer.Channel(0), []
+
+
+def _queue_audio(pygame, cpu: CPU6502, channel, backlog: list) -> None:
+    if channel is None:
+        return
+    data = cpu.bus.apu.take_samples()
+    if data:
+        backlog.append(pygame.mixer.Sound(buffer=data))
+    # Dropping the oldest chunks keeps latency bounded when audio and video drift apart.
+    del backlog[:-MAX_QUEUED_CHUNKS]
+    if backlog and not channel.get_busy():
+        channel.play(backlog.pop(0))
+    while backlog and channel.get_queue() is None:
+        channel.queue(backlog.pop(0))
+
+
 def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True) -> None:
     import pygame
 
@@ -32,6 +57,7 @@ def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True) -> None:
     palette = [tuple(color) for color in NES_PALETTE]
     key_map = _buttons()
     held = ""
+    channel, backlog = _start_audio(pygame, cpu)
     frames = 0
     fps_start = time.perf_counter()
     next_frame = fps_start
@@ -54,6 +80,7 @@ def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True) -> None:
             cpu.bus.controller_buttons[0] = buttons
 
             frame = cpu.run_frame()
+            _queue_audio(pygame, cpu, channel, backlog)
             surface = pygame.image.frombuffer(bytes(frame), (FRAME_WIDTH, FRAME_HEIGHT), "P")
             surface.set_palette(palette)
             pygame.transform.scale(surface.convert(window), window.get_size(), window)
