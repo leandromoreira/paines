@@ -3,12 +3,22 @@ from paines.bus.ppu import PPUBus, ppu_bus_builder
 
 FRAME_WIDTH = 256
 FRAME_HEIGHT = 240
+PPU_DOTS_PER_SCANLINE = 341
+PPU_SCANLINES_PER_FRAME = 262
+PPU_DOTS_PER_FRAME = PPU_DOTS_PER_SCANLINE * PPU_SCANLINES_PER_FRAME
+FRAME_START = 0
+VBLANK_START = 241 * PPU_DOTS_PER_SCANLINE + 1
+VBLANK_END = 261 * PPU_DOTS_PER_SCANLINE + 1
 
 
 class PPU:
     def __init__(self, bus: PPUBus | None = None) -> None:
         self.v_blank_status: U1 = 0
         self.v_blank_enabled: U1 = 0
+        self.nmi_pending: bool = False
+        self._nmi_line: bool = False
+        self.scanline = 261
+        self.dot = 0
         self.leader: U1 = 0
         self.spr_size: U1 = 0
         self.bg_pattern_table: U1 = 0
@@ -42,6 +52,7 @@ class PPU:
         self.read_buffer: U8 = 0x0
         self.bus = bus if bus is not None else ppu_bus_builder()
         self.frame_buffer = bytearray(FRAME_WIDTH * FRAME_HEIGHT)
+        self.frame_ready = False
 
     def write_oam(self, value: U8) -> None:
         self.oam_memory[self.oam_address] = value
@@ -55,6 +66,51 @@ class PPU:
 
     def read_vram(self, address: U16) -> U8:
         return self.bus.read(address)
+
+    def advance_cpu_cycles(self, cycles: int) -> None:
+        self.advance_dots(cycles * 3)
+
+    def advance_dots(self, dots: int) -> None:
+        position = self.scanline * PPU_DOTS_PER_SCANLINE + self.dot
+        remaining = dots
+
+        while remaining > 0:
+            distances = [
+                (event - position) % PPU_DOTS_PER_FRAME or PPU_DOTS_PER_FRAME
+                for event in (FRAME_START, VBLANK_START, VBLANK_END)
+            ]
+            distance = min(distances)
+            if distance > remaining:
+                break
+
+            position = (position + distance) % PPU_DOTS_PER_FRAME
+            remaining -= distance
+            if position == FRAME_START:
+                self.frame_ready = True
+                self.render_background()
+            else:
+                self.v_blank_status = int(position == VBLANK_START)
+                self._update_nmi_line()
+
+        position = (position + remaining) % PPU_DOTS_PER_FRAME
+        self.scanline, self.dot = divmod(position, PPU_DOTS_PER_SCANLINE)
+
+    def _update_nmi_line(self) -> None:
+        nmi_line = bool(self.v_blank_status and self.v_blank_enabled)
+        if nmi_line and not self._nmi_line:
+            self.nmi_pending = True
+        self._nmi_line = nmi_line
+
+    def take_nmi(self) -> bool:
+        pending = self.nmi_pending
+        self.nmi_pending = False
+        return pending
+
+    def take_frame(self) -> bytearray | None:
+        if not self.frame_ready:
+            return None
+        self.frame_ready = False
+        return self.frame_buffer
 
     def render_background(self) -> bytearray:
         universal_color = self.read_vram(0x3F00)

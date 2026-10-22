@@ -198,6 +198,12 @@ class CPU6502:
         return destination, actual_page_crossed
 
     def execute(self) -> U8:
+        if self.bus.ppu_mmio.ppu.take_nmi():
+            cycles = self.nmi()
+            self.total_cycle += cycles
+            self.bus.ppu_mmio.ppu.advance_cpu_cycles(cycles)
+            return cycles
+
         cycles: U8 = 0
         initial_address: U16 = self.pc
         op_code: U8 = self.bus.read(self.pc)
@@ -231,7 +237,23 @@ class CPU6502:
             cycles += 1
 
         self.total_cycle += cycles
+        self.bus.ppu_mmio.ppu.advance_cpu_cycles(cycles)
         return cycles
+
+    def run_frame(self) -> bytearray:
+        ppu = self.bus.ppu_mmio.ppu
+        if ppu.frame_ready:
+            frame = ppu.take_frame()
+            if frame is not None:
+                return frame
+
+        while not ppu.frame_ready:
+            self.execute()
+
+        frame = ppu.take_frame()
+        if frame is None:
+            raise RuntimeError("PPU frame became unavailable while running a frame")
+        return frame
 
     def perform_debug(
         self,

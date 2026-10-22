@@ -22,6 +22,7 @@ class PPUMMIO:
             self.ppu.scroll_t = (self.ppu.scroll_t & ~0x0C00) | (
                 self.ppu.base_nametable << 10
             )
+            self.ppu._update_nmi_line()
         elif address == 0x2001:
             self.ppu.emphasize_blue = value >> 7
             self.ppu.emphasize_green = value >> 6 & 0b1
@@ -71,6 +72,7 @@ class PPUMMIO:
                 | (self.open_bus & 0b11111)
             )
             self.ppu.v_blank_status = 0
+            self.ppu._update_nmi_line()
             self.open_bus = value
             return value
         elif address == 0x2004:
