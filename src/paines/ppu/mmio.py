@@ -19,6 +19,9 @@ class PPUMMIO:
             self.ppu.spr_pattern_table = value >> 3 & 0b1
             self.ppu.vram_increment = value >> 2 & 0b1
             self.ppu.base_nametable = value & 0b11
+            self.ppu.scroll_t = (self.ppu.scroll_t & ~0x0C00) | (
+                self.ppu.base_nametable << 10
+            )
         elif address == 0x2001:
             self.ppu.emphasize_blue = value >> 7
             self.ppu.emphasize_green = value >> 6 & 0b1
