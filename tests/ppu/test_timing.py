@@ -121,3 +121,53 @@ def test_cpu_run_frame_advances_until_frame_is_ready(tmp_path) -> None:
     assert len(frame) == 256 * 240
     assert cpu.total_cycle > 0
     assert not bus.ppu_mmio.ppu.frame_ready
+
+
+def _advance_to(ppu: PPU, scanline: int, dot: int) -> None:
+    current = ppu.scanline * PPU_DOTS_PER_SCANLINE + ppu.dot
+    target = scanline * PPU_DOTS_PER_SCANLINE + dot
+    ppu.advance_dots((target - current) % PPU_DOTS_PER_FRAME)
+
+
+def test_sprite_zero_hit_appears_during_the_frame_not_at_vblank() -> None:
+    ppu = PPU()
+    ppu.bg_enabled = 1
+    ppu.spr_enabled = 1
+    ppu.show_bg_leftmost = 1
+    ppu.show_spr_leftmost = 1
+    for address in range(0x2000, 0x23C0):
+        ppu.write_vram(address, 1)
+    for row in range(8):
+        ppu.write_vram(0x0010 + row, 0xFF)  # opaque background tile 1
+        ppu.write_vram(0x0020 + row, 0xFF)  # opaque sprite tile 2
+    ppu.oam_memory[0:4] = bytes((49, 2, 0, 100))
+    for index in range(1, 64):
+        ppu.oam_memory[index * 4] = 239
+
+    _advance_to(ppu, 49, 300)
+    assert ppu.spr_zero_hit == 0
+    _advance_to(ppu, 50, 300)
+    assert ppu.spr_zero_hit == 1
+
+
+def test_scroll_written_mid_frame_applies_to_later_scanlines() -> None:
+    ppu = PPU()
+    ppu.bg_enabled = 1
+    ppu.show_bg_leftmost = 1
+    ppu.write_vram(0x3F01, 0x16)
+    for row in range(8):
+        ppu.write_vram(0x0010 + row, 0xFF)
+    for address in range(0x2000, 0x23C0):
+        ppu.write_vram(address, (address - 0x2000) % 2)
+
+    _advance_to(ppu, 0, 300)
+    ppu.scroll_t = 0
+    ppu.scroll_x = 0
+    ppu.scroll_v = 0
+    _advance_to(ppu, 20, 0)
+    ppu.scroll_v = (ppu.scroll_v & ~0x1F) | 1  # coarse X = 1 for scanlines after 20
+    ppu.scroll_t = (ppu.scroll_t & ~0x1F) | 1
+    _advance_to(ppu, 30, 0)
+
+    assert ppu.frame_buffer[10 * 256 + 0] == 0
+    assert ppu.frame_buffer[25 * 256 + 0] == 0x16
