@@ -53,9 +53,18 @@ class CPUBus:
         return 0x40 | bit
 
     def read(self, address: U16) -> U8:
+        # RAM and PRG-ROM make up nearly every access, so they skip the method calls below.
         if address <= 0x1FFF:
-            self.open_bus = self.ram.read(address)
-            return self.open_bus
+            ram = self.ram
+            value = self.open_bus = ram.cells[address & ram.ram_mask]
+            return value
+
+        if address >= 0x8000:
+            cartridge = self.cartridge
+            value = self.open_bus = cartridge.prg[
+                cartridge.prg_offsets[(address >> 13) & 3] + (address & 0x1FFF)
+            ]
+            return value
 
         if address >= 0x2000 and address <= 0x3FFF:
             self.open_bus = self.ppu_mmio.read(address)
@@ -89,7 +98,8 @@ class CPUBus:
         self.open_bus = value
 
         if address <= 0x1FFF:
-            self.ram.write(address, value)
+            ram = self.ram
+            ram.cells[address & ram.ram_mask] = value & 0xFF
             return
 
         if address >= 0x2000 and address <= 0x3FFF:
