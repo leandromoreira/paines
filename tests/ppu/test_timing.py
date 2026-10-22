@@ -76,7 +76,7 @@ def test_status_read_clears_vblank_but_does_not_cancel_pending_nmi() -> None:
 def test_cpu_services_pending_ppu_nmi_and_advances_timing(tmp_path) -> None:
     bus = CPUBus()
     bus.cartridge.prg = bytearray(0x8000)
-    bus.cartridge.prg_mask = 0x7FFF
+    bus.cartridge.prg_offsets = [0, 0x4000]
     bus.cartridge.prg[0x7FFA] = 0x78
     bus.cartridge.prg[0x7FFB] = 0x56
     ppu = bus.ppu_mmio.ppu
@@ -111,7 +111,7 @@ def test_frame_boundary_renders_and_exposes_a_frame() -> None:
 def test_cpu_run_frame_advances_until_frame_is_ready(tmp_path) -> None:
     bus = CPUBus()
     bus.cartridge.prg = bytearray(0x8000)
-    bus.cartridge.prg_mask = 0x7FFF
+    bus.cartridge.prg_offsets = [0, 0x4000]
     bus.cartridge.prg[0:3] = b"\x4c\x00\x80"
     cpu = CPU6502(bus=bus, file_name=str(tmp_path / "cpu.log"))
     cpu.pc = 0x8000

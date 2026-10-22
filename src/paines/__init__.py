@@ -5,6 +5,7 @@ from pathlib import Path
 
 from paines.bus.bus import CPUBus
 from paines.cartridge.cartridge import Cartridge
+from paines.cartridge.mappers import is_supported
 from paines.cpu.cpu import CPU6502
 from paines.ppu.frame import write_ppm
 
@@ -13,7 +14,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="paines")
     commands = parser.add_subparsers(dest="command", required=True)
     dump_frame = commands.add_parser(
-        "dump-frame", help="run one mapper-0 ROM frame and write a PPM image"
+        "dump-frame", help="run one ROM frame and write a PPM image"
     )
     dump_frame.add_argument("rom", type=Path)
     dump_frame.add_argument("-o", "--output", type=Path, default=Path("frame.ppm"))
@@ -23,7 +24,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=4,
         help="number of startup frames to run before saving (default: 4)",
     )
-    play_command = commands.add_parser("play", help="play a mapper-0 ROM in a window")
+    play_command = commands.add_parser("play", help="play a ROM in a window")
     play_command.add_argument("rom", type=Path)
     play_command.add_argument("--scale", type=int, default=3)
     args = parser.parse_args(argv)
@@ -42,7 +43,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         parser.error(f"{args.rom} is not an iNES ROM")
     if cartridge.prg_size == 0:
         parser.error("ROM has no PRG-ROM")
-    if cartridge.mapper_id != 0:
+    if not is_supported(cartridge.mapper_id):
         parser.error(f"mapper {cartridge.mapper_id} is not supported by this command")
 
     bus = CPUBus(cartridge=cartridge)

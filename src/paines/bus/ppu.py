@@ -43,14 +43,14 @@ class PPUBus:
         nametable_addr: U16 = (address - 0x2000) % 0x1000
         nametable_index = nametable_addr // 0x400
         offset = nametable_addr % 0x400
-        physical_bank: U1 = 0
-
-        if self.cartridge.nametable_mirroring == 0:
-            physical_bank = 0 if nametable_index in [0, 1] else 1
-            return (physical_bank * 0x400) + offset
-        else:
-            physical_bank = 0 if nametable_index in [0, 2] else 1
-            return (physical_bank * 0x400) + offset
+        mirroring = self.cartridge.nametable_mirroring
+        if mirroring == 0:  # horizontal
+            physical_bank: U1 = 0 if nametable_index in (0, 1) else 1
+        elif mirroring == 1:  # vertical
+            physical_bank = 0 if nametable_index in (0, 2) else 1
+        else:  # single screen: 2 = lower bank, 3 = upper bank
+            physical_bank = mirroring & 1
+        return (physical_bank * 0x400) + offset
 
     def _resolve_palette_mirroring(self, address: U16) -> U16:
         palette_index: U16 = (address - 0x3F00) & 0x1F

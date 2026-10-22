@@ -1,4 +1,5 @@
-from paines.types import U16, U8, U4, U1
+from paines.cartridge.mappers import MAPPERS, NROM, Mapper
+from paines.types import U16, U8, U4, U2
 
 # https://problemkaputt.de/everynes.htm#techdata
 #   4018h-5FFFh   Cartridge Expansion Area almost 8K
@@ -10,6 +11,8 @@ SRAM_END: U16 = 0x7FFF
 SRAM_MASK: U16 = SRAM_END - SRAM_START
 ONE_PRG_BANK: U16 = 0x4000
 ONE_CHR_BANK: U16 = 0x2000
+CHR_PAGE: U16 = 0x1000
+TRAINER_SIZE = 512
 
 
 class Cartridge:
@@ -23,15 +26,20 @@ class Cartridge:
         self.chr_is_ram: bool = True
         self.flags_6: U8 = 0
         self.has_battery_sram: bool = False
-        self.nametable_mirroring: U1 = 0
+        self.nametable_mirroring: U2 = 0
         self.flags_7: U8 = 0
         self.mapper_id: U8 = 0
         self.prg_ram_size: U8 = 0
         self.flags_9: U8 = 0
         self.flags_10: U8 = 0
         self.unused: bytes = b""
-        self.prg_mask: U16 = 0xFFFF
-        self.chr = bytearray(ONE_CHR_BANK)
+        self.chr = bytearray(ONE_CHR_BANK)  # the 8 KB the PPU currently sees
+        self.chr_rom = bytearray()
+        self.sram = bytearray(SRAM_END - SRAM_START + 1)
+        self.prg_banks = 1
+        # Start of the 16 KB PRG bank visible at $8000 and at $C000.
+        self.prg_offsets = [0, ONE_PRG_BANK]
+        self.mapper: Mapper = NROM(self)
 
     def load(self, file: str) -> None:
         with open(file, "rb") as rom:
@@ -53,31 +61,49 @@ class Cartridge:
             high_mapper_id: U4 = self.flags_7 >> 4
             self.mapper_id = (high_mapper_id << 4) | low_mapper_id
 
+            if self.flags_6 & 0b100:
+                rom.seek(TRAINER_SIZE, 1)
             self.prg = bytearray(rom.read(ONE_PRG_BANK * self.prg_size))
             self.chr_is_ram = self.chr_size == 0
             chr_data = rom.read(ONE_CHR_BANK * self.chr_size)
-            self.chr = bytearray(chr_data) if chr_data else bytearray(ONE_CHR_BANK)
-            self.sram = [0] * (SRAM_END - SRAM_START + 1)
-            if self.prg_size == 1:
-                self.prg_mask = (ONE_PRG_BANK * self.prg_size) - 1
-            else:
-                # TODO: come back to check for mappers
-                self.prg_mask = (ONE_PRG_BANK * 2) - 1
+            self.chr_rom = bytearray(chr_data)
+            self.chr = bytearray(chr_data[:ONE_CHR_BANK]) if chr_data else bytearray(ONE_CHR_BANK)
+            self.sram = bytearray(SRAM_END - SRAM_START + 1)
+            self.prg_banks = max(self.prg_size, 1)
+            # Unsupported mappers fall back to NROM; the CLI rejects them before running.
+            self.mapper = MAPPERS.get(self.mapper_id, NROM)(self)
+
+    @property
+    def has_prg_ram(self) -> bool:
+        return self.has_battery_sram or self.mapper.uses_prg_ram
+
+    def map_prg(self, slot: int, bank: int) -> None:
+        self.prg_offsets[slot] = (bank % self.prg_banks) * ONE_PRG_BANK
+
+    def map_chr(self, slot: int, bank: int) -> None:
+        """Show 4 KB CHR-ROM page `bank` in PPU window `slot` (0: $0000, 1: $1000)."""
+        if self.chr_is_ram:
+            return
+        pages = max(len(self.chr_rom) // CHR_PAGE, 1)
+        source = (bank % pages) * CHR_PAGE
+        target = slot * CHR_PAGE
+        self.chr[target : target + CHR_PAGE] = self.chr_rom[source : source + CHR_PAGE]
+
+    def patch_prg(self, address: U16, value: U8) -> None:
+        self.prg[self.prg_offsets[(address >> 14) & 1] + (address & 0x3FFF)] = value
 
     def read(self, address: U16, open_bus: U8) -> U8:
         if address >= 0x8000:
-            return self.prg[(address - CPU_PRG_START) & self.prg_mask]
-        if address >= 0x6000 and self.has_battery_sram:
-            # TODO: to implement
+            return self.prg[self.prg_offsets[(address >> 14) & 1] + (address & 0x3FFF)]
+        if address >= SRAM_START and self.has_prg_ram:
             return self.sram[(address - SRAM_START) & SRAM_MASK]
         return open_bus
 
     def write(self, address: U16, value: U8) -> None:
-        # TODO: to implement
         if address >= 0x8000:
-            self.prg[(address - CPU_PRG_START) & self.prg_mask] = value
-            return
-        return
+            self.mapper.write(address, value)
+        elif address >= SRAM_START and self.has_prg_ram:
+            self.sram[(address - SRAM_START) & SRAM_MASK] = value
 
     def read_chr(self, address: U16) -> U8:
         if address <= 0x1FFF:
