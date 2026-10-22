@@ -2,7 +2,6 @@ from paines.ppu.mmio import PPUMMIO
 from paines.bus.bus import CPUBus
 from paines.cpu.cpu import CPU6502
 from paines.ppu.ppu import (
-    FRAME_START,
     PPU,
     PPU_DOTS_PER_FRAME,
     PPU_DOTS_PER_SCANLINE,
@@ -92,7 +91,7 @@ def test_frame_boundary_renders_and_exposes_a_frame() -> None:
     ppu = PPU()
     ppu.write_vram(0x3F00, 0x2A)
     dots_until_frame = (
-        FRAME_START - (ppu.scanline * PPU_DOTS_PER_SCANLINE + ppu.dot)
+        VBLANK_START - (ppu.scanline * PPU_DOTS_PER_SCANLINE + ppu.dot)
     ) % PPU_DOTS_PER_FRAME
 
     ppu.advance_dots(dots_until_frame)
@@ -101,6 +100,7 @@ def test_frame_boundary_renders_and_exposes_a_frame() -> None:
     assert frame is not None
     assert frame[0] == 0x2A
     assert frame[-1] == 0x2A
+    assert (ppu.scanline, ppu.dot) == (241, 1)
     assert ppu.take_frame() is None
 
 

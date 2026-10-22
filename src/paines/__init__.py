@@ -17,7 +17,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     dump_frame.add_argument("rom", type=Path)
     dump_frame.add_argument("-o", "--output", type=Path, default=Path("frame.ppm"))
+    dump_frame.add_argument(
+        "--skip-frames",
+        type=int,
+        default=4,
+        help="number of startup frames to run before saving (default: 4)",
+    )
     args = parser.parse_args(argv)
+    if args.skip_frames < 0:
+        parser.error("--skip-frames must be non-negative")
 
     cartridge = Cartridge()
     try:
@@ -36,6 +44,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     cpu = CPU6502(bus=bus, file_name=devnull)
     try:
         cpu.reset()
+        for _ in range(args.skip_frames):
+            cpu.run_frame()
         frame = cpu.run_frame()
         write_ppm(frame, args.output)
     finally:

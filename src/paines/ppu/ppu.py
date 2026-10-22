@@ -6,7 +6,6 @@ FRAME_HEIGHT = 240
 PPU_DOTS_PER_SCANLINE = 341
 PPU_SCANLINES_PER_FRAME = 262
 PPU_DOTS_PER_FRAME = PPU_DOTS_PER_SCANLINE * PPU_SCANLINES_PER_FRAME
-FRAME_START = 0
 VBLANK_START = 241 * PPU_DOTS_PER_SCANLINE + 1
 VBLANK_END = 261 * PPU_DOTS_PER_SCANLINE + 1
 
@@ -77,7 +76,7 @@ class PPU:
         while remaining > 0:
             distances = [
                 (event - position) % PPU_DOTS_PER_FRAME or PPU_DOTS_PER_FRAME
-                for event in (FRAME_START, VBLANK_START, VBLANK_END)
+                for event in (VBLANK_START, VBLANK_END)
             ]
             distance = min(distances)
             if distance > remaining:
@@ -85,12 +84,11 @@ class PPU:
 
             position = (position + distance) % PPU_DOTS_PER_FRAME
             remaining -= distance
-            if position == FRAME_START:
+            if position == VBLANK_START:
                 self.frame_ready = True
                 self.render_background()
-            else:
-                self.v_blank_status = int(position == VBLANK_START)
-                self._update_nmi_line()
+            self.v_blank_status = int(position == VBLANK_START)
+            self._update_nmi_line()
 
         position = (position + remaining) % PPU_DOTS_PER_FRAME
         self.scanline, self.dot = divmod(position, PPU_DOTS_PER_SCANLINE)

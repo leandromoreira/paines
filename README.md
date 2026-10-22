@@ -54,3 +54,17 @@ NES CPU Cycles               : 26553
 Real time / NES CPU Cycles   : 0.001216 ms
 --------------------------------------------------------
 ```
+
+## Dumping a frame
+
+The current background renderer can produce a PPM preview from mapper-0 iNES
+ROMs:
+
+```sh
+uv run paines dump-frame path/to/game.nes --output frame.ppm
+```
+
+The command skips four startup frames by default; use `--skip-frames 0` to
+capture the first frame or provide a different non-negative count. The renderer
+currently draws backgrounds only, without sprites or scanline-accurate effects,
+so this is an early preview rather than a complete game image.

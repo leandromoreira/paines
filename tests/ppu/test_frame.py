@@ -44,7 +44,16 @@ def test_dump_frame_command_runs_mapper_zero_rom(tmp_path, capsys) -> None:
     prg[0x7FFC:0x7FFE] = b"\x00\x80"
     rom_path.write_bytes(header + prg)
 
-    main(["dump-frame", str(rom_path), "--output", str(output)])
+    main(
+        [
+            "dump-frame",
+            str(rom_path),
+            "--output",
+            str(output),
+            "--skip-frames",
+            "0",
+        ]
+    )
 
     assert output.read_bytes().startswith(b"P6\n256 240\n255\n")
     assert "Wrote" in capsys.readouterr().out
