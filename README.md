@@ -71,6 +71,10 @@ effects, so this is an early preview rather than a complete game image.
 
 ## Playing a ROM
 
+<video src="docs/demo.mp4" controls muted width="400"></video>
+
+[Watch the demo](docs/demo.mp4) (Super Mario Bros. 3 running in the pygame window).
+
 ROMs using mappers 0 (NROM), 1 (MMC1), 2 (UxROM), 3 (CNROM) and 4 (MMC3) can be played in a window (requires the optional `pygame-ce` dependency):
 
 ```sh
