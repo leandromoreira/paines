@@ -60,7 +60,8 @@ class APU:
         return status
 
     def write(self, address: int, value: int) -> None:
-        if address >= 0x4015:
+        # Elapsed cycles must be resolved with the old register values before they change.
+        if self._pending:
             self._process()
         if address <= 0x4013:
             register = address & 3

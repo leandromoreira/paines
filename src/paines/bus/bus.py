@@ -117,7 +117,6 @@ class CPUBus:
             return
 
         if address >= 0x4018 and address <= 0xFFFF:
-            # TODO: to implement
             self.cartridge.write(address, value)
             return
 

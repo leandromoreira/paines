@@ -90,6 +90,16 @@ def test_pulse_outputs_duty_pattern_at_the_programmed_frequency() -> None:
     assert 400 < frequency < 480
 
 
+def test_channel_register_writes_first_account_for_elapsed_cycles() -> None:
+    apu = APU()
+    apu._threshold = 1000  # keep the cycles pending, as happens between CPU instructions
+    apu.tick(10)
+    assert apu._pending == 10
+    apu.write(0x4002, 0x20)
+    assert apu._pending == 0
+    assert apu._frame_cycle == 10
+
+
 def test_pulse_is_muted_for_tiny_periods() -> None:
     apu = APU()
     apu.write(0x4015, 0x01)

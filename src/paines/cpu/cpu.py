@@ -286,7 +286,6 @@ class CPU6502:
             DebugTrace(initial_address, op_code),
         ]
         for i in range(operand_length):
-            # TODO: should be careful by reading IO mm
             bytes_for_debug.append(
                 DebugTrace(
                     initial_address + 1 + i, self.bus.peek(initial_address + 1 + i)

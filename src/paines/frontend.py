@@ -1,4 +1,6 @@
+import threading
 import time
+from array import array
 
 from paines.apu.apu import SAMPLE_RATE
 from paines.cpu.cpu import CPU6502
@@ -6,7 +8,10 @@ from paines.ppu.frame import NES_PALETTE
 from paines.ppu.ppu import FRAME_HEIGHT, FRAME_WIDTH
 
 FRAME_SECONDS = 1 / 60
-MAX_QUEUED_CHUNKS = 6
+AUDIO_CHUNK_SAMPLES = 512
+TARGET_BUFFER_SAMPLES = 2048
+MAX_BUFFER_SAMPLES = 8192
+BUFFER_CORRECTION = 0.02
 
 # Bit order matches the controller shift register: A, B, Select, Start, Up, Down, Left, Right
 def _buttons():
@@ -25,27 +30,110 @@ def _buttons():
     )
 
 
+def resample(data: bytes, length: int) -> bytes:
+    """Linearly stretches or shrinks 16-bit mono samples to `length` samples."""
+    source = array("h")
+    source.frombytes(data)
+    count = len(source)
+    if count == length or count < 2 or length < 1:
+        return data
+    last = count - 1
+    step = last / max(length - 1, 1)
+    out = array("h", bytes(2 * length))
+    for i in range(length):
+        position = i * step
+        index = int(position)
+        if index >= last:
+            out[i] = source[last]
+        else:
+            fraction = position - index
+            out[i] = int(source[index] + (source[index + 1] - source[index]) * fraction)
+    return out.tobytes()
+
+
+def audio_target_length(frame_period: float, buffered_samples: int) -> int:
+    """Samples to emit for one frame so audio is produced as fast as it is played.
+
+    The emulator may run slower than 60 FPS; emitting exactly the wall-clock period's
+    worth of samples (slightly slowing the sound) avoids buffer underruns, and a small
+    correction keeps the buffer near its desired fill.
+    """
+    error = (TARGET_BUFFER_SAMPLES - buffered_samples) / TARGET_BUFFER_SAMPLES
+    correction = 1 + max(-1.0, min(1.0, error)) * BUFFER_CORRECTION
+    return max(1, round(frame_period * SAMPLE_RATE * correction))
+
+
+class AudioBuffer:
+    """Thread-safe FIFO between the emulator (producer) and the audio callback (consumer)."""
+
+    def __init__(self) -> None:
+        self._data = bytearray()
+        self._lock = threading.Lock()
+        self._playing = False
+        self._last = b"\x00\x00"
+
+    @property
+    def samples(self) -> int:
+        return len(self._data) // 2
+
+    def push(self, data: bytes) -> None:
+        with self._lock:
+            self._data += data
+            # Dropping the oldest audio keeps latency bounded when the consumer stalls.
+            overflow = len(self._data) - 2 * MAX_BUFFER_SAMPLES
+            if overflow > 0:
+                del self._data[:overflow]
+            if len(self._data) >= 2 * TARGET_BUFFER_SAMPLES:
+                self._playing = True
+
+    def pull(self, size: int) -> bytes:
+        with self._lock:
+            if not self._playing:
+                return self._last * (size // 2)
+            chunk = bytes(self._data[:size])
+            del self._data[:size]
+            if chunk:
+                self._last = chunk[-2:]
+            if len(chunk) < size:
+                # Underrun: hold the last sample and wait for the cushion to refill.
+                self._playing = False
+                chunk += self._last * ((size - len(chunk)) // 2)
+            return chunk
+
+
 def _start_audio(pygame, cpu: CPU6502):
     try:
-        pygame.mixer.init(frequency=SAMPLE_RATE, size=-16, channels=1, buffer=1024)
-    except pygame.error:
-        return None, []
+        pygame.mixer.init(frequency=SAMPLE_RATE, size=-16, channels=1)
+        from pygame._sdl2.audio import AUDIO_S16, AudioDevice
+
+        buffer = AudioBuffer()
+
+        def callback(device, view) -> None:
+            view[:] = buffer.pull(len(view))
+
+        device = AudioDevice(
+            devicename=None,
+            iscapture=False,
+            frequency=SAMPLE_RATE,
+            audioformat=AUDIO_S16,
+            numchannels=1,
+            chunksize=AUDIO_CHUNK_SAMPLES,
+            allowed_changes=0,
+            callback=callback,
+        )
+    except (pygame.error, ImportError):
+        return None, None
     cpu.bus.apu.output_enabled = True
-    return pygame.mixer.Channel(0), []
+    device.pause(0)
+    return device, buffer
 
 
-def _queue_audio(pygame, cpu: CPU6502, channel, backlog: list) -> None:
-    if channel is None:
+def _queue_audio(cpu: CPU6502, buffer: AudioBuffer | None, frame_period: float) -> None:
+    if buffer is None:
         return
     data = cpu.bus.apu.take_samples()
     if data:
-        backlog.append(pygame.mixer.Sound(buffer=data))
-    # Dropping the oldest chunks keeps latency bounded when audio and video drift apart.
-    del backlog[:-MAX_QUEUED_CHUNKS]
-    if backlog and not channel.get_busy():
-        channel.play(backlog.pop(0))
-    while backlog and channel.get_queue() is None:
-        channel.queue(backlog.pop(0))
+        buffer.push(resample(data, audio_target_length(frame_period, buffer.samples)))
 
 
 def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True) -> None:
@@ -57,10 +145,12 @@ def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True) -> None:
     palette = [tuple(color) for color in NES_PALETTE]
     key_map = _buttons()
     held = ""
-    channel, backlog = _start_audio(pygame, cpu)
+    audio_device, audio_buffer = _start_audio(pygame, cpu)
     frames = 0
     fps_start = time.perf_counter()
     next_frame = fps_start
+    last_frame = fps_start
+    frame_period = FRAME_SECONDS
     running = True
     try:
         while running:
@@ -80,7 +170,10 @@ def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True) -> None:
             cpu.bus.controller_buttons[0] = buttons
 
             frame = cpu.run_frame()
-            _queue_audio(pygame, cpu, channel, backlog)
+            frame_started = time.perf_counter()
+            frame_period += (max(frame_started - last_frame, FRAME_SECONDS) - frame_period) * 0.1
+            last_frame = frame_started
+            _queue_audio(cpu, audio_buffer, frame_period)
             surface = pygame.image.frombuffer(bytes(frame), (FRAME_WIDTH, FRAME_HEIGHT), "P")
             surface.set_palette(palette)
             pygame.transform.scale(surface.convert(window), window.get_size(), window)
@@ -101,4 +194,6 @@ def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True) -> None:
             else:
                 next_frame = time.perf_counter()
     finally:
+        if audio_device is not None:
+            audio_device.close()
         pygame.quit()
