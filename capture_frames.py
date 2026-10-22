@@ -11,7 +11,7 @@ from paines.bus.bus import CPUBus
 from paines.cartridge.cartridge import Cartridge
 from paines.cartridge.mappers import is_supported
 from paines.cpu.cpu import CPU6502
-from paines.ppu.frame import write_ppm
+from paines.ppu.frame import write_png
 
 OUTPUT_DIR = Path(__file__).parent / "frames"
 DEFAULT_DIRS = [Path(__file__).parent / "tests" / "cartridge" / "zelda"]
@@ -37,8 +37,8 @@ def capture(rom: Path, frames: int) -> Path | None:
     finally:
         cpu.debug_file.close()
 
-    output = OUTPUT_DIR / f"{rom.stem.strip()}.ppm"
-    write_ppm(frame, output)
+    output = OUTPUT_DIR / f"{rom.stem.strip()}.png"
+    write_png(frame, output)
     print(f"ok    {rom.name} (mapper {cartridge.mapper_id}) -> {output.name}")
     return output
 

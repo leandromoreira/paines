@@ -88,8 +88,16 @@ device is available, the game runs silently.
 ## Tracking what works
 
 `capture_frames.py` runs every supported ROM in the given folders (tapping Start every 50 frames),
-and saves the last frame of each to `frames/` as a PPM:
+and saves the last frame of each to `frames/` as a PNG:
 
 ```sh
 uv run python capture_frames.py "path/to/roms" tests/cartridge/zelda
 ```
+
+| | | |
+|---|---|---|
+| ![Contra](<frames/Contra (USA).png>) | ![Super Mario Bros. 3](<frames/Super Mario Bros. 3 (USA).png>) | ![DuckTales](<frames/DuckTales (USA).png>) |
+| ![Tetris](<frames/Tetris (USA).png>) | ![Rad Racer](<frames/Rad Racer (USA).png>) | ![Zelda](frames/Zelda.png) |
+
+The `dump-frame` command writes a PPM, which most viewers and GitHub can't display inline;
+convert it with `write_png` from `paines.ppu.frame` if needed.

@@ -1,6 +1,9 @@
+import struct
+import zlib
+
 import pytest
 
-from paines.ppu.frame import NES_PALETTE, write_ppm
+from paines.ppu.frame import NES_PALETTE, write_png, write_ppm
 from paines.ppu.ppu import FRAME_HEIGHT, FRAME_WIDTH
 
 
@@ -57,3 +60,25 @@ def test_dump_frame_command_runs_mapper_zero_rom(tmp_path, capsys) -> None:
 
     assert output.read_bytes().startswith(b"P6\n256 240\n255\n")
     assert "Wrote" in capsys.readouterr().out
+
+
+def test_write_png_round_trips_the_rgb_pixels(tmp_path) -> None:
+    frame = bytearray(FRAME_WIDTH * FRAME_HEIGHT)
+    frame[0] = 1
+    frame[-1] = 5
+    output = tmp_path / "frame.png"
+
+    write_png(frame, output)
+
+    data = output.read_bytes()
+    assert data.startswith(b"\x89PNG\r\n\x1a\n")
+    width, height = struct.unpack(">II", data[16:24])
+    assert (width, height) == (FRAME_WIDTH, FRAME_HEIGHT)
+    idat_start = data.index(b"IDAT") + 4
+    idat_length = struct.unpack(">I", data[idat_start - 8 : idat_start - 4])[0]
+    raw = zlib.decompress(data[idat_start : idat_start + idat_length])
+    stride = 1 + FRAME_WIDTH * 3
+    assert raw[1:4] == bytes(NES_PALETTE[1])
+    assert raw[-3:] == bytes(NES_PALETTE[5])
+    assert len(raw) == stride * FRAME_HEIGHT
+    assert data.endswith(b"IEND" + struct.pack(">I", zlib.crc32(b"IEND")))
