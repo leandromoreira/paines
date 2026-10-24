@@ -1,6 +1,8 @@
 # POC
 
-https://github.com/user-attachments/assets/ce23932e-54a3-45fd-9bc0-7d023a2a28c6
+python serving web and html rendering the frames via long polling (remote play on browser/streaming)
+
+https://github.com/user-attachments/assets/f5279611-d94d-4438-be40-b829029aa773
 
 # Numbers
 
