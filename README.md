@@ -95,6 +95,40 @@ frame counter with its IRQ, and the nonlinear mixer. Channels are advanced
 arithmetically right before each output sample rather than every CPU cycle. If no audio
 device is available, the game runs silently.
 
+## Playing in a browser (plain HTTP)
+
+A proof of concept that streams the emulator to a web page using nothing but plain HTTP
+long polling: no WebSockets, no extra dependencies (standard library only). It has no
+audio and serves a single player.
+
+```sh
+uv run paines serve path/to/game.nes --port 8080
+```
+
+Then open <http://127.0.0.1:8080/>. Controls are the same as in the window: arrows = D-pad,
+`X` = A, `Z` = B, `Enter` = Start, `Tab`/`Shift` = Select. The page shows live stats (fps,
+KB per frame, fetch time). Add `?fps=30` to cap the client's request rate, or `?z=0` to
+turn gzip off. Add `?crt=1` for a WebGL2 CRT shader (curvature, bloom, scanlines, phosphor mask,
+vignette), with `&signal=composite` or `&signal=rf` for a dirtier analog look. It is the same shader
+as the pygame `--crt` work, ported to GLSL ES, and falls back to the plain canvas without WebGL2.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /` | the page (`src/paines/web/index.html`) |
+| `GET /palette` | the 64 NES colours as 192 RGB bytes, fetched once |
+| `GET /frame?after=N` | long poll: waits for a frame newer than `N`, then returns 256x240 palette indices (gzip by default). `X-Frame-Seq` is the frame number; `204` means nothing new yet |
+| `POST /input` | body is the controller bitmask as a decimal number |
+| `GET /stats` | JSON counters (emulation ms per frame) |
+
+How it works: an emulator thread runs `run_frame()` at 60 Hz and publishes each frame with
+a sequence number. Each waiting `/frame` request sleeps on a condition variable until a
+newer frame exists, so slow clients simply skip frames instead of queueing them. The
+browser does the palette lookup and paints a canvas.
+
+Measured locally on Super Mario Bros. 3, it holds 60 fps at about 4.5 KB per frame with
+gzip (60 KB without). The limit is the emulation itself, not HTTP. Network latency and
+audio are untested.
+
 ## Half human, half AI
 
 This project is a deliberate mix. The CPU was written by hand, one opcode at a time, and

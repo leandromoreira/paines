@@ -12,16 +12,189 @@
 <body>
 <canvas id="screen" width="256" height="240"></canvas>
 <div id="stats">connecting...</div>
-<div>arrows, Z = B, X = A, Enter = Start, Tab/Shift = Select &nbsp;|&nbsp; ?fps=30 caps the request rate, ?z=0 turns gzip off</div>
+<div>arrows, Z = B, X = A, Enter = Start, Tab/Shift = Select &nbsp;|&nbsp; ?fps=30 caps the request rate, ?z=0 turns gzip off, ?crt=1 adds the CRT shader (&amp;signal=composite or rf)</div>
 <script>
 const params = new URLSearchParams(location.search);
 const targetFps = Number(params.get("fps") || 0);        // 0 = as fast as frames arrive
 const gzipFlag = params.get("z") === "0" ? "0" : "1";
 const W = 256, H = 240;
-const ctx = document.getElementById("screen").getContext("2d");
-const image = ctx.createImageData(W, H);
-const pixels = new Uint32Array(image.data.buffer);
-const palette = new Uint32Array(64);
+const canvas = document.getElementById("screen");
+
+// ---- rendering: a WebGL2 CRT shader with ?crt=1, otherwise a plain 2D canvas ----
+const VERTEX = `#version 300 es
+in vec2 position;
+out vec2 uv;
+void main() {
+  uv = position * 0.5 + 0.5;
+  gl_Position = vec4(position, 0.0, 1.0);
+}`;
+
+const FRAGMENT = `#version 300 es
+precision highp float;
+uniform sampler2D frame;    // R8: palette index / 255
+uniform sampler2D palette;  // 64x1 RGB
+uniform vec2 source_size;
+uniform float curvature, bloom, scanline_depth, mask_floor, vignette;
+uniform float chroma_blur;  // chroma smear in source pixels (0 = clean RGB)
+uniform float crawl;        // dot-crawl strength
+uniform float ghost;        // delayed echo of the signal
+uniform float snow;         // RF noise
+uniform float jitter;       // per-line horizontal wobble in source pixels
+uniform float time;
+in vec2 uv;
+out vec4 color;
+
+vec3 texel(vec2 p) {
+  vec2 c = clamp(p, vec2(0.0), vec2(1.0));
+  float index = floor(texture(frame, vec2(c.x, 1.0 - c.y)).r * 255.0 + 0.5);
+  return texture(palette, vec2((index + 0.5) / 64.0, 0.5)).rgb;
+}
+
+const mat3 TO_YIQ = mat3(0.299, 0.596, 0.211, 0.587, -0.274, -0.523, 0.114, -0.322, 0.312);
+const mat3 FROM_YIQ = mat3(1.0, 1.0, 1.0, 0.956, -0.272, -1.106, 0.621, -0.647, 1.703);
+
+float hash(vec2 v) { return fract(sin(dot(v, vec2(12.9898, 78.233))) * 43758.5453); }
+
+// Composite/RF approximation: sharp luma, smeared chroma, dot crawl and an echo.
+vec3 signal(vec2 p) {
+  vec3 yiq = TO_YIQ * texel(p);
+  if (chroma_blur <= 0.0) return FROM_YIQ * yiq;
+  vec2 dx = vec2(chroma_blur / source_size.x, 0.0);
+  vec2 iq = vec2(0.0);
+  float total = 0.0;
+  for (int i = -3; i <= 3; i++) {
+    float w = exp(-float(i * i) / 4.0);
+    iq += (TO_YIQ * texel(p + dx * float(i))).yz * w;
+    total += w;
+  }
+  iq /= total;
+  float y = yiq.x;
+  vec2 px = floor(p * source_size);
+  y += crawl * length(iq) * sin(2.0944 * (px.x + 2.0 * px.y + time));
+  y += ghost * (TO_YIQ * texel(p - vec2(4.0 / source_size.x, 0.0))).x;
+  return FROM_YIQ * vec3(y, iq);
+}
+
+void main() {
+  vec2 centred = uv * 2.0 - 1.0;
+  centred *= 1.0 + curvature * dot(centred.yx, centred.yx);
+  vec2 p = centred * 0.5 + 0.5;
+  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) { color = vec4(0.0, 0.0, 0.0, 1.0); return; }
+
+  p.x += jitter * (hash(vec2(floor(p.y * source_size.y), time)) - 0.5) / source_size.x;
+  vec3 base = signal(p);
+
+  vec2 texel_step = 1.0 / source_size;
+  vec3 glow = vec3(0.0);
+  float total = 0.0;
+  for (int y = -2; y <= 2; y++) {
+    for (int x = -3; x <= 3; x++) {
+      float w = exp(-(float(x * x) / 4.5 + float(y * y) / 2.0));
+      glow += texel(p + vec2(float(x), float(y)) * texel_step) * w;
+      total += w;
+    }
+  }
+  glow /= total;
+  vec3 rgb = base + bloom * glow * glow * 2.0;
+
+  float row = fract(p.y * source_size.y);
+  rgb *= 1.0 - scanline_depth * pow(abs(row - 0.5) * 2.0, 2.0);
+
+  int column = int(gl_FragCoord.x) % 3;
+  vec3 tint = vec3(mask_floor);
+  tint[column] = 1.0;
+  rgb *= tint;
+
+  rgb += snow * (hash(gl_FragCoord.xy + time) - 0.5);
+  rgb *= 1.0 - vignette * pow(min(1.0, dot(centred, centred) / 2.0), 1.5);
+  color = vec4(rgb, 1.0);
+}`;
+
+const SIGNALS = {
+  rgb:       { chroma_blur: 0.0, crawl: 0.0,  ghost: 0.0,  snow: 0.0,  jitter: 0.0 },
+  composite: { chroma_blur: 1.5, crawl: 0.12, ghost: 0.0,  snow: 0.0,  jitter: 0.0 },
+  rf:        { chroma_blur: 2.5, crawl: 0.2,  ghost: 0.15, snow: 0.12, jitter: 0.35 },
+};
+const LOOK = { curvature: 0.025, bloom: 0.35, scanline_depth: 0.45, mask_floor: 0.8, vignette: 0.35 };
+
+function compile(gl, type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+  return shader;
+}
+
+function texture(gl, unit, width, height, format, filter) {
+  const t = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, format.internal, width, height, 0, format.base, gl.UNSIGNED_BYTE, null);
+  return t;
+}
+
+let render, setPalette;
+const gl = params.get("crt") === "1" ? canvas.getContext("webgl2") : null;
+if (gl) {
+  const scale = window.devicePixelRatio || 1;
+  canvas.width = Math.round(768 * scale);   // match the on-screen pixels so the phosphor mask stays crisp
+  canvas.height = Math.round(720 * scale);
+  const program = gl.createProgram();
+  gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, VERTEX));
+  gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, FRAGMENT));
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+  gl.useProgram(program);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const position = gl.getAttribLocation(program, "position");
+  gl.enableVertexAttribArray(position);
+  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  texture(gl, 0, W, H, { internal: gl.R8, base: gl.RED });
+  texture(gl, 1, 64, 1, { internal: gl.RGB8, base: gl.RGB });
+  gl.uniform1i(gl.getUniformLocation(program, "frame"), 0);
+  gl.uniform1i(gl.getUniformLocation(program, "palette"), 1);
+  gl.uniform2f(gl.getUniformLocation(program, "source_size"), W, H);
+  const signal = SIGNALS[params.get("signal")] || SIGNALS.rgb;
+  for (const [name, value] of Object.entries({ ...LOOK, ...signal })) {
+    gl.uniform1f(gl.getUniformLocation(program, name), value);
+  }
+  const timeUniform = gl.getUniformLocation(program, "time");
+  gl.viewport(0, 0, canvas.width, canvas.height);
+
+  let ticks = 0;
+  setPalette = rgb => {
+    gl.activeTexture(gl.TEXTURE1);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 1, gl.RGB, gl.UNSIGNED_BYTE, rgb);
+  };
+  render = frame => {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, W, H, gl.RED, gl.UNSIGNED_BYTE, frame);
+    gl.uniform1f(timeUniform, ticks++ % 1024);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  };
+} else {
+  const ctx = canvas.getContext("2d");
+  const image = ctx.createImageData(W, H);
+  const pixels = new Uint32Array(image.data.buffer);
+  const colours = new Uint32Array(64);
+  setPalette = rgb => {
+    for (let i = 0; i < 64; i++) {
+      colours[i] = 0xff000000 | rgb[i * 3 + 2] << 16 | rgb[i * 3 + 1] << 8 | rgb[i * 3];
+    }
+  };
+  render = frame => {
+    for (let i = 0; i < pixels.length; i++) pixels[i] = colours[frame[i] & 63];
+    ctx.putImageData(image, 0, 0);
+  };
+}
 
 // ---- input: one POST in flight at a time, always carrying the latest mask ----
 const KEYS = { x: 0x01, z: 0x02, Shift: 0x04, Tab: 0x04, Enter: 0x08,
@@ -52,9 +225,7 @@ addEventListener("keyup", e => setKey(e, false));
 let seq = 0, drawn = 0, bytes = 0, fetchMs = 0, lastReport = performance.now();
 async function loop() {
   const rgb = new Uint8Array(await (await fetch("/palette")).arrayBuffer());
-  for (let i = 0; i < 64; i++) {
-    palette[i] = 0xff000000 | rgb[i * 3 + 2] << 16 | rgb[i * 3 + 1] << 8 | rgb[i * 3];
-  }
+  setPalette(rgb);
   let next = performance.now();
   for (;;) {
     const t = performance.now();
@@ -71,8 +242,7 @@ async function loop() {
     // Content-Length is the compressed size on the wire, even though fetch hands us the decoded body.
     bytes += Number(response.headers.get("Content-Length") || frame.length);
     seq = Number(response.headers.get("X-Frame-Seq"));
-    for (let i = 0; i < pixels.length; i++) pixels[i] = palette[frame[i] & 63];
-    ctx.putImageData(image, 0, 0);
+    render(frame);
     drawn++;
 
     const now = performance.now();
