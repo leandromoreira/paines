@@ -70,23 +70,21 @@ class Emulator(threading.Thread):
         self.buttons = 0
         self.stop_event = threading.Event()
         self.frames = 0
-        self.busy_seconds = 0.0
 
     def run(self) -> None:
-        next_frame = time.perf_counter()
+        # Deadlines are absolute (start + n * period), so a slow frame is paid back by sleeping
+        # less on the next ones instead of drifting.
+        deadline = time.perf_counter()
         while not self.stop_event.is_set():
-            started = time.perf_counter()
             self.cpu.bus.controller_buttons[0] = self.buttons
-            frame = bytes(self.cpu.run_frame())
-            self.publisher.publish(frame)
+            self.publisher.publish(bytes(self.cpu.run_frame()))
             self.frames += 1
-            self.busy_seconds += time.perf_counter() - started
-            next_frame += self.period
-            delay = next_frame - time.perf_counter()
+            deadline += self.period
+            delay = deadline - time.perf_counter()
             if delay > 0:
                 time.sleep(delay)
             else:
-                next_frame = time.perf_counter()
+                deadline = time.perf_counter()  # too far behind: give up catching up and resync
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -119,8 +117,7 @@ class Handler(BaseHTTPRequestHandler):
             self._frame(int(query.get("after", ["0"])[0]), query.get("z", ["1"])[0] != "0")
         elif url.path == "/stats":
             emulator = self.server.emulator
-            stats = {"seq": self.server.publisher.seq, "emulated_frames": emulator.frames,
-                     "emulation_ms_per_frame": 1000 * emulator.busy_seconds / max(emulator.frames, 1)}  # fmt: skip
+            stats = {"seq": self.server.publisher.seq, "emulated_frames": emulator.frames}
             self._send(200, json.dumps(stats).encode(), "application/json")
         else:
             self._send(404)

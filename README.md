@@ -108,11 +108,8 @@ uv run paines serve path/to/game.nes --port 8080
 ```
 
 Then open <http://127.0.0.1:8080/>. Controls are the same as in the window: arrows = D-pad,
-`X` = A, `Z` = B, `Enter` = Start, `Tab`/`Shift` = Select. The page shows live stats (fps,
-KB per frame, fetch time). Add `?fps=30` to cap the client's request rate, or `?z=0` to
-turn gzip off. Add `?crt=1` for a WebGL2 CRT shader (curvature, bloom, scanlines, phosphor mask,
-vignette), with `&signal=composite` or `&signal=rf` for a dirtier analog look. It is the same shader
-as the pygame `--crt` work, ported to GLSL ES, and falls back to the plain canvas without WebGL2.
+`X` = A, `Z` = B, `Enter` = Start, `Tab`/`Shift` = Select. The page shows the live fps and the
+server's frame number. Add `?z=0` to the `/frame` URL to turn gzip off.
 
 | Endpoint | What it does |
 |---|---|
@@ -120,7 +117,7 @@ as the pygame `--crt` work, ported to GLSL ES, and falls back to the plain canva
 | `GET /palette` | the 64 NES colours as 192 RGB bytes, fetched once |
 | `GET /frame?after=N` | long poll: waits for a frame newer than `N`, then returns 256x240 palette indices (gzip by default). `X-Frame-Seq` is the frame number; `204` means nothing new yet |
 | `POST /input` | body is the controller bitmask as a decimal number |
-| `GET /stats` | JSON counters (emulation ms per frame) |
+| `GET /stats` | JSON counters (`seq`, `emulated_frames`) |
 
 How it works: an emulator thread runs `run_frame()` at 60 Hz and publishes each frame with
 a sequence number. Each waiting `/frame` request sleeps on a condition variable until a
