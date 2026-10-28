@@ -1,6 +1,8 @@
 # POC
 
-https://github.com/user-attachments/assets/ce23932e-54a3-45fd-9bc0-7d023a2a28c6
+python serving web and html rendering the frames via long polling (remote play on browser/streaming)
+
+https://github.com/user-attachments/assets/f5279611-d94d-4438-be40-b829029aa773
 
 # Numbers
 
@@ -94,6 +96,37 @@ implements both pulse channels (envelope, sweep, length), triangle, noise, DMC, 
 frame counter with its IRQ, and the nonlinear mixer. Channels are advanced
 arithmetically right before each output sample rather than every CPU cycle. If no audio
 device is available, the game runs silently.
+
+## Playing in a browser (plain HTTP)
+
+A proof of concept that streams the emulator to a web page using nothing but plain HTTP
+long polling: no WebSockets, no extra dependencies (standard library only). It has no
+audio and serves a single player.
+
+```sh
+uv run paines serve path/to/game.nes --port 8080
+```
+
+Then open <http://127.0.0.1:8080/>. Controls are the same as in the window: arrows = D-pad,
+`X` = A, `Z` = B, `Enter` = Start, `Tab`/`Shift` = Select. The page shows the live fps and the
+server's frame number. Add `?z=0` to the `/frame` URL to turn gzip off.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /` | the page (`src/paines/web/index.html`) |
+| `GET /palette` | the 64 NES colours as 192 RGB bytes, fetched once |
+| `GET /frame?after=N` | long poll: waits for a frame newer than `N`, then returns 256x240 palette indices (gzip by default). `X-Frame-Seq` is the frame number; `204` means nothing new yet |
+| `POST /input` | body is the controller bitmask as a decimal number |
+| `GET /stats` | JSON counters (`seq`, `emulated_frames`) |
+
+How it works: an emulator thread runs `run_frame()` at 60 Hz and publishes each frame with
+a sequence number. Each waiting `/frame` request sleeps on a condition variable until a
+newer frame exists, so slow clients simply skip frames instead of queueing them. The
+browser does the palette lookup and paints a canvas.
+
+Measured locally on Super Mario Bros. 3, it holds 60 fps at about 4.5 KB per frame with
+gzip (60 KB without). The limit is the emulation itself, not HTTP. Network latency and
+audio are untested.
 
 ## Half human, half AI
 

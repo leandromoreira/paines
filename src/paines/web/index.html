@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>paines (plain HTTP)</title>
+  <style>
+    body {
+      background: #111;
+      color: #ccc;
+      font: 14px monospace;
+      text-align: center;
+      margin: 1em;
+    }
+
+    canvas {
+      width: 768px;
+      height: 720px;
+      image-rendering: pixelated;
+      background: #000;
+    }
+
+    #stats {
+      margin-top: .5em;
+      white-space: pre;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="screen" width="256" height="240"></canvas>
+  <div id="stats">connecting...</div>
+  <div>arrows, Z = B, X = A, Enter = Start, Tab/Shift = Select</div>
+  <script>
+    const W = 256, H = 240;
+    const canvas = document.getElementById("screen");
+    const ctx = canvas.getContext("2d");
+    const image = ctx.createImageData(W, H);
+    const pixels = new Uint32Array(image.data.buffer);   // one 32-bit RGBA value per pixel
+    const colours = new Uint32Array(64);                 // the NES palette, filled in from /palette
+
+    // ---- drawing: a frame is 61,440 palette indices (one byte per pixel) ----
+    function setPalette(rgb) {
+      for (let i = 0; i < 64; i++) {
+        colours[i] = 0xff000000 | rgb[i * 3 + 2] << 16 | rgb[i * 3 + 1] << 8 | rgb[i * 3];
+      }
+    }
+    function render(frame) {
+      for (let i = 0; i < pixels.length; i++) pixels[i] = colours[frame[i] & 63];
+      ctx.putImageData(image, 0, 0);
+    }
+
+    // ---- input: one POST in flight at a time, always carrying the latest mask ----
+    const KEYS = {
+      x: 0x01, z: 0x02, Shift: 0x04, Tab: 0x04, Enter: 0x08,
+      ArrowUp: 0x10, ArrowDown: 0x20, ArrowLeft: 0x40, ArrowRight: 0x80
+    };
+    let mask = 0, sentMask = 0, sending = false;
+    async function flushInput() {
+      if (sending) return;
+      sending = true;
+      while (sentMask !== mask) {
+        const value = mask;
+        await fetch("/input", { method: "POST", body: String(value), keepalive: true });
+        sentMask = value;
+      }
+      sending = false;
+    }
+    function setKey(event, down) {
+      const bit = KEYS[event.key];
+      if (!bit) return;
+      event.preventDefault();
+      mask = down ? mask | bit : mask & ~bit;
+      flushInput();
+    }
+    addEventListener("keydown", e => { if (!e.repeat) setKey(e, true); });
+    addEventListener("keyup", e => setKey(e, false));
+
+    // ---- frames: long poll for anything newer than the last one we drew ----
+    // The server paces the game; this loop never sleeps. Each request waits on the server until a
+    // frame newer than `seq` exists, so the next request goes out right after the last one is drawn.
+    let seq = 0, drawn = 0, lastReport = performance.now();
+    async function loop() {
+      setPalette(new Uint8Array(await (await fetch("/palette")).arrayBuffer()));
+      for (; ;) {
+        let response;
+        try {
+          response = await fetch(`/frame?after=${seq}`);
+        } catch (error) {
+          await new Promise(r => setTimeout(r, 500));   // server unreachable: back off, then retry
+          continue;
+        }
+        if (response.status === 204) continue;           // nothing new within 1 s, ask again
+        seq = Number(response.headers.get("X-Frame-Seq"));
+        render(new Uint8Array(await response.arrayBuffer()));
+        drawn++;
+
+        const now = performance.now();
+        if (now - lastReport >= 1000) {
+          document.getElementById("stats").textContent =
+            `${(drawn * 1000 / (now - lastReport)).toFixed(1)} fps   server frame #${seq}`;
+          drawn = 0;
+          lastReport = now;
+        }
+      }
+    }
+    loop();
+  </script>
+</body>
+
+</html>

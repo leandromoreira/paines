@@ -27,8 +27,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     play_command = commands.add_parser("play", help="play a ROM in a window")
     play_command.add_argument("rom", type=Path)
     play_command.add_argument("--scale", type=int, default=3)
+    serve_command = commands.add_parser("serve", help="play a ROM in a browser over plain HTTP")
+    serve_command.add_argument("rom", type=Path)
+    serve_command.add_argument("--host", default="127.0.0.1")
+    serve_command.add_argument("--port", type=int, default=8080)
+    serve_command.add_argument("--fps", type=float, default=60.0, help="emulation rate")
     args = parser.parse_args(argv)
-    if args.command == "play":
+    if args.command in ("play", "serve"):
         args.skip_frames = 0
     if args.skip_frames < 0:
         parser.error("--skip-frames must be non-negative")
@@ -54,6 +59,11 @@ def main(argv: Sequence[str] | None = None) -> None:
             from paines.frontend import play
 
             play(cpu, scale=args.scale)
+            return
+        if args.command == "serve":
+            from paines.server import serve
+
+            serve(cpu, host=args.host, port=args.port, fps=args.fps)
             return
         for _ in range(args.skip_frames):
             cpu.run_frame()
