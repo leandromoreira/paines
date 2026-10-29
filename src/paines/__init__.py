@@ -27,7 +27,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     play_command = commands.add_parser("play", help="play a ROM in a window")
     play_command.add_argument("rom", type=Path)
     play_command.add_argument("--scale", type=int, default=3)
-    serve_command = commands.add_parser("serve", help="play a ROM in a browser over plain HTTP")
+    serve_command = commands.add_parser(
+        "serve", help="play a ROM in a browser over plain HTTP"
+    )
     serve_command.add_argument("rom", type=Path)
     serve_command.add_argument("--host", default="127.0.0.1")
     serve_command.add_argument("--port", type=int, default=8080)

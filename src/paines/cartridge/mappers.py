@@ -155,7 +155,9 @@ class MMC3(Mapper):
             self._apply()
         elif region == 1:  # $A000-$BFFF
             if even:
-                self.cartridge.nametable_mirroring = HORIZONTAL if value & 1 else VERTICAL
+                self.cartridge.nametable_mirroring = (
+                    HORIZONTAL if value & 1 else VERTICAL
+                )
             # odd: PRG-RAM protect, ignored so games with battery RAM keep working
         elif region == 2:  # $C000-$DFFF
             if even:
@@ -193,7 +195,16 @@ class MMC3(Mapper):
 
         # R0/R1 are 2 KB banks (low bit ignored); R2-R5 are 1 KB banks.
         r0, r1 = registers[0] & ~1, registers[1] & ~1
-        layout = [r0, r0 | 1, r1, r1 | 1, registers[2], registers[3], registers[4], registers[5]]
+        layout = [
+            r0,
+            r0 | 1,
+            r1,
+            r1 | 1,
+            registers[2],
+            registers[3],
+            registers[4],
+            registers[5],
+        ]
         if self.bank_select & 0x80:
             layout = layout[4:] + layout[:4]
         for slot, bank in enumerate(layout):

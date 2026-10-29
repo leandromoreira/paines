@@ -16,7 +16,10 @@ from paines.types import U16, U8, U1
 
 class PPUBus:
     def __init__(
-        self, ram: RAM | None = None, cartridge: Cartridge | None = None, palette_ram: RAM | None = None
+        self,
+        ram: RAM | None = None,
+        cartridge: Cartridge | None = None,
+        palette_ram: RAM | None = None,
     ) -> None:
         self.open_bus: U8 = 0
         self.cartridge = cartridge or cartridge_builder()

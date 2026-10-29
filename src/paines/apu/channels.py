@@ -20,9 +20,43 @@ DUTY_SEQUENCES = (
     (1, 0, 0, 1, 1, 1, 1, 1),
 )
 
-NOISE_PERIODS = (4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068)
+NOISE_PERIODS = (
+    4,
+    8,
+    16,
+    32,
+    64,
+    96,
+    128,
+    160,
+    202,
+    254,
+    380,
+    508,
+    762,
+    1016,
+    2034,
+    4068,
+)
 
-DMC_RATES = (428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54)
+DMC_RATES = (
+    428,
+    380,
+    340,
+    320,
+    286,
+    254,
+    226,
+    214,
+    190,
+    160,
+    142,
+    128,
+    106,
+    84,
+    72,
+    54,
+)
 
 TRIANGLE_SEQUENCE = tuple(range(15, -1, -1)) + tuple(range(16))
 
@@ -110,7 +144,12 @@ class Pulse:
     def clock_length_and_sweep(self) -> None:
         if not self.envelope.loop and self.length > 0:
             self.length -= 1
-        if self.sweep_divider == 0 and self.sweep_enabled and self.sweep_shift and not self._muted():
+        if (
+            self.sweep_divider == 0
+            and self.sweep_enabled
+            and self.sweep_shift
+            and not self._muted()
+        ):
             self.timer_period = self._sweep_target()
         if self.sweep_divider == 0 or self.sweep_reload:
             self.sweep_divider = self.sweep_period

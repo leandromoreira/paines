@@ -201,6 +201,8 @@ class CPU6502:
         bus = self.bus
         ppu = bus.ppu_mmio.ppu
         apu = bus.apu
+        cycles: U8 = 0
+
         if ppu.nmi_pending:
             ppu.nmi_pending = False
             cycles = self.nmi()
@@ -216,7 +218,6 @@ class CPU6502:
             apu.tick(cycles)
             return cycles
 
-        cycles: U8 = 0
         initial_address: U16 = self.pc
         op_code: U8 = bus.read(self.pc)
         self.pc += 1

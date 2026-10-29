@@ -159,9 +159,12 @@ class APU:
         if not self.output_enabled:
             return
 
-        mixed = PULSE_MIX[self.pulse1.output() + self.pulse2.output()] + TND_MIX[
-            3 * self.triangle.output() + 2 * self.noise.output() + self.dmc.output()
-        ]
+        mixed = (
+            PULSE_MIX[self.pulse1.output() + self.pulse2.output()]
+            + TND_MIX[
+                3 * self.triangle.output() + 2 * self.noise.output() + self.dmc.output()
+            ]
+        )
         # High-pass filter removes the DC offset like the console's output stage.
         filtered = mixed - self._filter_in + 0.996 * self._filter_out
         self._filter_in = mixed

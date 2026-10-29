@@ -92,7 +92,9 @@ class PPUMMIO:
                 value_to_return = self.ppu.read_buffer
                 self.ppu.read_buffer = fetched
 
-            self.ppu.scroll_v = (self.ppu.scroll_v + (32 if self.ppu.vram_increment else 1)) & 0x7FFF
+            self.ppu.scroll_v = (
+                self.ppu.scroll_v + (32 if self.ppu.vram_increment else 1)
+            ) & 0x7FFF
             self.open_bus = value_to_return
             return self.open_bus
 

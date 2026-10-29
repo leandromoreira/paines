@@ -4,7 +4,7 @@ test:
 	uvx ruff format .
 	uvx ty check
 	uvx ruff check . --select ANN --unsafe-fixes --fix
-	uvx mypy .
+	uv run mypy .
 	uv run --with pytest-cov pytest -s --cov=src/
 build:
 	uv build

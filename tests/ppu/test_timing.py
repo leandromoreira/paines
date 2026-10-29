@@ -177,7 +177,9 @@ def test_status_read_sees_vblank_that_starts_during_the_instruction(tmp_path) ->
     bus = CPUBus()
     bus.cartridge.prg = bytearray(0x8000)
     bus.cartridge.prg_offsets = [0, 0x2000, 0x4000, 0x6000]
-    bus.cartridge.prg[0:3] = b"\xad\x02\x20"  # LDA $2002 (4 cycles, reads on the last one)
+    bus.cartridge.prg[0:3] = (
+        b"\xad\x02\x20"  # LDA $2002 (4 cycles, reads on the last one)
+    )
     ppu = bus.ppu_mmio.ppu
     ppu.scanline, ppu.dot = 241, 0  # vblank starts 1 dot in, well before the read
     cpu = CPU6502(bus=bus, file_name=str(tmp_path / "cpu.log"))
@@ -193,7 +195,11 @@ def test_status_read_sees_vblank_that_starts_during_the_instruction(tmp_path) ->
 def test_ppu_clocks_mapper_once_per_rendered_scanline_only_when_rendering() -> None:
     bus = CPUBus()
     clocks: list[int] = []
-    bus.cartridge.mapper.clock_scanline = lambda: clocks.append(1)  # type: ignore[method-assign]
+
+    def mock_clock_scanline() -> None:
+        clocks.append(1)
+
+    bus.cartridge.mapper.clock_scanline = mock_clock_scanline  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
     ppu = bus.ppu_mmio.ppu
 
     ppu.advance_dots(PPU_DOTS_PER_FRAME)

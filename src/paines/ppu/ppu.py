@@ -24,7 +24,10 @@ _EVENTS: tuple[tuple[int, int], ...] = tuple(
             (VBLANK_END, -2),
             (PRE_RENDER_SCROLL_COPY, -3),
         ]
-        + [(y * PPU_DOTS_PER_SCANLINE + MAPPER_CLOCK_DOT, -4) for y in (*range(FRAME_HEIGHT), 261)]
+        + [
+            (y * PPU_DOTS_PER_SCANLINE + MAPPER_CLOCK_DOT, -4)
+            for y in (*range(FRAME_HEIGHT), 261)
+        ]
     )
 )
 _EVENT_POSITIONS = [position for position, _ in _EVENTS]
@@ -178,7 +181,9 @@ class PPU:
                 self.scroll_v = (self.scroll_v & ~0x7BFF) | (self.scroll_t & 0x7BFF)
 
         self.dots_to_event = event_position - end
-        self._scanline, self._dot = divmod(end % PPU_DOTS_PER_FRAME, PPU_DOTS_PER_SCANLINE)
+        self._scanline, self._dot = divmod(
+            end % PPU_DOTS_PER_FRAME, PPU_DOTS_PER_SCANLINE
+        )
 
     def _update_nmi_line(self) -> None:
         nmi_line = bool(self.v_blank_status and self.v_blank_enabled)
@@ -230,7 +235,9 @@ class PPU:
         if self.bg_enabled:
             self._render_background_line(y, color_mask, universal_color)
         else:
-            self.frame_buffer[line_start:line_end] = bytes([universal_color]) * FRAME_WIDTH
+            self.frame_buffer[line_start:line_end] = (
+                bytes([universal_color]) * FRAME_WIDTH
+            )
             self._background_opaque[line_start:line_end] = bytes(FRAME_WIDTH)
 
         if self.spr_enabled:
@@ -257,7 +264,9 @@ class PPU:
             v = (v & ~0x03E0) | (coarse_y << 5)
         self.scroll_v = v
 
-    def _render_background_line(self, y: int, color_mask: int, universal_color: int) -> None:
+    def _render_background_line(
+        self, y: int, color_mask: int, universal_color: int
+    ) -> None:
         v = self.scroll_v
         coarse_x = v & 0x1F
         nametable = (v >> 10) & 0x03
@@ -295,14 +304,18 @@ class PPU:
         table_bytes[0] = universal_color
         for palette in range(4):
             for pixel in range(1, 4):
-                table_bytes[palette * 4 + pixel] = palette_cells[palette * 4 + pixel] & color_mask
+                table_bytes[palette * 4 + pixel] = (
+                    palette_cells[palette * 4 + pixel] & color_mask
+                )
 
         line_start = y * FRAME_WIDTH
         line_end = line_start + FRAME_WIDTH
         self.frame_buffer[line_start:line_end] = pixels.translate(table_bytes)
         self._background_opaque[line_start:line_end] = pixels.translate(_OPAQUE_TABLE)
         if not self.show_bg_leftmost:
-            self.frame_buffer[line_start : line_start + 8] = bytes([universal_color]) * 8
+            self.frame_buffer[line_start : line_start + 8] = (
+                bytes([universal_color]) * 8
+            )
             self._background_opaque[line_start : line_start + 8] = bytes(8)
 
     def _render_sprite_line(self, y: int, color_mask: int) -> None:
@@ -355,7 +368,12 @@ class PPU:
                     continue
 
                 frame_index = line_start + screen_x
-                if sprite_index == 0 and screen_x < 255 and self.bg_enabled and opaque[frame_index]:
+                if (
+                    sprite_index == 0
+                    and screen_x < 255
+                    and self.bg_enabled
+                    and opaque[frame_index]
+                ):
                     self.spr_zero_hit = 1
 
                 if occupied[screen_x]:
