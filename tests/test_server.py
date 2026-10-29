@@ -24,11 +24,13 @@ class FakeCPU:
 def start():
     publisher = FramePublisher()
     cpu = FakeCPU()
-    emulator = Emulator(cpu, publisher, fps=200)
+    emulator = Emulator(cpu, publisher, fps=200)  # ty: ignore[invalid-argument-type]
     server = NesServer(("127.0.0.1", 0), emulator, publisher)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     emulator.start()
-    connection = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=5)
+    connection = http.client.HTTPConnection(
+        "127.0.0.1", server.server_address[1], timeout=5
+    )
     return server, emulator, cpu, connection
 
 

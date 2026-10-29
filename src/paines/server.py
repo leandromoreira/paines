@@ -1,12 +1,12 @@
 """Play a ROM in a browser using nothing but plain HTTP (no WebSockets).
 
-    GET  /             the page
-    GET  /palette      192 bytes, the 64 RGB colours
-    GET  /frame?after=N  long poll: blocks until a frame newer than N exists, then returns
-                         256x240 palette indices (X-Frame-Seq carries its number).
-                         Add z=0 to disable gzip; 204 means "nothing new yet, ask again".
-    POST /input        body is the controller bitmask as a decimal number
-    GET  /stats        JSON counters
+GET  /             the page
+GET  /palette      192 bytes, the 64 RGB colours
+GET  /frame?after=N  long poll: blocks until a frame newer than N exists, then returns
+                     256x240 palette indices (X-Frame-Seq carries its number).
+                     Add z=0 to disable gzip; 204 means "nothing new yet, ask again".
+POST /input        body is the controller bitmask as a decimal number
+GET  /stats        JSON counters
 """
 
 import gzip
@@ -15,7 +15,9 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlparse
+from paines.cpu.cpu import CPU6502
 
 from paines.ppu.frame import NES_PALETTE
 
@@ -62,7 +64,9 @@ class FramePublisher:
 class Emulator(threading.Thread):
     """Runs frames at a fixed rate and publishes each one."""
 
-    def __init__(self, cpu, publisher: FramePublisher, fps: float = 60.0) -> None:
+    def __init__(
+        self, cpu: CPU6502, publisher: FramePublisher, fps: float = 60.0
+    ) -> None:
         super().__init__(daemon=True)
         self.cpu = cpu
         self.publisher = publisher
@@ -84,18 +88,26 @@ class Emulator(threading.Thread):
             if delay > 0:
                 time.sleep(delay)
             else:
-                deadline = time.perf_counter()  # too far behind: give up catching up and resync
+                deadline = (
+                    time.perf_counter()
+                )  # too far behind: give up catching up and resync
 
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"  # keep-alive
     disable_nagle_algorithm = True
-    server: "NesServer"
+    server: "NesServer"  # ty: ignore[invalid-mutable-override]
 
-    def log_message(self, format: str, *args) -> None:
+    def log_message(self, format: str, *args: object) -> None:
         pass
 
-    def _send(self, status: int, body: bytes = b"", content_type: str = "application/octet-stream", **headers) -> None:
+    def _send(
+        self,
+        status: int,
+        body: bytes = b"",
+        content_type: str = "application/octet-stream",
+        **headers: object,
+    ) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
@@ -112,12 +124,19 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/":
             self._send(200, INDEX_HTML.read_bytes(), "text/html; charset=utf-8")
         elif url.path == "/palette":
-            self._send(200, bytes(channel for color in NES_PALETTE for channel in color[:3]))
+            self._send(
+                200, bytes(channel for color in NES_PALETTE for channel in color[:3])
+            )
         elif url.path == "/frame":
-            self._frame(int(query.get("after", ["0"])[0]), query.get("z", ["1"])[0] != "0")
+            self._frame(
+                int(query.get("after", ["0"])[0]), query.get("z", ["1"])[0] != "0"
+            )
         elif url.path == "/stats":
             emulator = self.server.emulator
-            stats = {"seq": self.server.publisher.seq, "emulated_frames": emulator.frames}
+            stats = {
+                "seq": self.server.publisher.seq,
+                "emulated_frames": emulator.frames,
+            }
             self._send(200, json.dumps(stats).encode(), "application/json")
         else:
             self._send(404)
@@ -129,7 +148,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         seq, raw = newest
         if compress:
-            self._send(200, self.server.publisher.gzipped(seq, raw), Content_Encoding="gzip", X_Frame_Seq=seq)
+            self._send(
+                200,
+                self.server.publisher.gzipped(seq, raw),
+                Content_Encoding="gzip",
+                X_Frame_Seq=seq,
+            )
         else:
             self._send(200, raw, X_Frame_Seq=seq)
 
@@ -150,13 +174,17 @@ class NesServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address: tuple[str, int], emulator: Emulator, publisher: FramePublisher) -> None:
+    def __init__(
+        self, address: tuple[str, int], emulator: Emulator, publisher: FramePublisher
+    ) -> None:
         super().__init__(address, Handler)
         self.emulator = emulator
         self.publisher = publisher
 
 
-def serve(cpu, host: str = "127.0.0.1", port: int = 8080, fps: float = 60.0) -> None:
+def serve(
+    cpu: CPU6502, host: str = "127.0.0.1", port: int = 8080, fps: float = 60.0
+) -> None:
     publisher = FramePublisher()
     emulator = Emulator(cpu, publisher, fps)
     server = NesServer((host, port), emulator, publisher)

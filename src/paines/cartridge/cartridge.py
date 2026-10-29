@@ -70,7 +70,11 @@ class Cartridge:
             self.chr_is_ram = self.chr_size == 0
             chr_data = rom.read(ONE_CHR_BANK * self.chr_size)
             self.chr_rom = bytearray(chr_data)
-            self.chr = bytearray(chr_data[:ONE_CHR_BANK]) if chr_data else bytearray(ONE_CHR_BANK)
+            self.chr = (
+                bytearray(chr_data[:ONE_CHR_BANK])
+                if chr_data
+                else bytearray(ONE_CHR_BANK)
+            )
             self.sram = bytearray(SRAM_END - SRAM_START + 1)
             self.prg_banks = max(self.prg_size, 1)
             # Unsupported mappers fall back to NROM; the CLI rejects them before running.
@@ -98,7 +102,9 @@ class Cartridge:
         pages = max(len(self.chr_rom) // CHR_PAGE_1K, 1)
         source = (bank % pages) * CHR_PAGE_1K
         target = slot * CHR_PAGE_1K
-        self.chr[target : target + CHR_PAGE_1K] = self.chr_rom[source : source + CHR_PAGE_1K]
+        self.chr[target : target + CHR_PAGE_1K] = self.chr_rom[
+            source : source + CHR_PAGE_1K
+        ]
 
     def map_chr(self, slot: int, bank: int) -> None:
         """Show 4 KB CHR-ROM page `bank` in PPU window `slot` (0: $0000, 1: $1000)."""

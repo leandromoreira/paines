@@ -31,7 +31,10 @@ class CPUBus:
             ppu = ppu_builder(bus=ppu_bus_builder(cartridge=self.cartridge))
             ppu_mmio = ppu_mmio_builder(ppu)
         self.ppu_mmio = ppu_mmio
-        self.controller_buttons: list[U8] = [0, 0]  # A,B,Select,Start,Up,Down,Left,Right = bits 0-7
+        self.controller_buttons: list[U8] = [
+            0,
+            0,
+        ]  # A,B,Select,Start,Up,Down,Left,Right = bits 0-7
         self._controller_shift: list[U8] = [0, 0]
         self._controller_strobe = False
         self.dma_stall_cycles = 0

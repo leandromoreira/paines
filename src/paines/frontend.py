@@ -1,11 +1,14 @@
 import threading
 import time
 from array import array
+from typing import Any
+from types import ModuleType
 
 from paines.apu.apu import SAMPLE_RATE
 from paines.cpu.cpu import CPU6502
 from paines.ppu.frame import NES_PALETTE
 from paines.ppu.ppu import FRAME_HEIGHT, FRAME_WIDTH
+from pygame._sdl2.audio import AUDIO_S16, AudioDevice
 
 FRAME_SECONDS = 1 / 60
 AUDIO_CHUNK_SAMPLES = 512
@@ -13,8 +16,9 @@ TARGET_BUFFER_SAMPLES = 2048
 MAX_BUFFER_SAMPLES = 8192
 BUFFER_CORRECTION = 0.02
 
+
 # Bit order matches the controller shift register: A, B, Select, Start, Up, Down, Left, Right
-def _buttons():
+def _buttons() -> tuple[tuple[str, int, int], ...]:
     import pygame
 
     return (
@@ -101,14 +105,15 @@ class AudioBuffer:
             return chunk
 
 
-def _start_audio(pygame, cpu: CPU6502):
+def _start_audio(
+    pygame: ModuleType, cpu: CPU6502
+) -> tuple[AudioDevice | None, AudioBuffer | None]:
     try:
         pygame.mixer.init(frequency=SAMPLE_RATE, size=-16, channels=1)
-        from pygame._sdl2.audio import AUDIO_S16, AudioDevice
 
         buffer = AudioBuffer()
 
-        def callback(device, view) -> None:
+        def callback(_: AudioDevice, view: memoryview) -> None:
             view[:] = buffer.pull(len(view))
 
         device = AudioDevice(
@@ -121,7 +126,7 @@ def _start_audio(pygame, cpu: CPU6502):
             allowed_changes=0,
             callback=callback,
         )
-    except (pygame.error, ImportError):
+    except pygame.error, ImportError:
         return None, None
     cpu.bus.apu.output_enabled = True
     device.pause(0)
@@ -171,10 +176,14 @@ def play(cpu: CPU6502, scale: int = 3, show_fps: bool = True) -> None:
 
             frame = cpu.run_frame()
             frame_started = time.perf_counter()
-            frame_period += (max(frame_started - last_frame, FRAME_SECONDS) - frame_period) * 0.1
+            frame_period += (
+                max(frame_started - last_frame, FRAME_SECONDS) - frame_period
+            ) * 0.1
             last_frame = frame_started
             _queue_audio(cpu, audio_buffer, frame_period)
-            surface = pygame.image.frombuffer(bytes(frame), (FRAME_WIDTH, FRAME_HEIGHT), "P")
+            surface = pygame.image.frombuffer(
+                bytes(frame), (FRAME_WIDTH, FRAME_HEIGHT), "P"
+            )
             surface.set_palette(palette)
             pygame.transform.scale(surface.convert(window), window.get_size(), window)
             pygame.display.flip()

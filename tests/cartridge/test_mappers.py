@@ -95,7 +95,9 @@ def test_mmc1_needs_five_writes_to_commit_a_register(tmp_path: Path) -> None:
     assert cartridge.read(0x8000, 0) == 15 % 8
 
 
-def test_mmc1_reset_bit_clears_shift_register_and_locks_prg_mode(tmp_path: Path) -> None:
+def test_mmc1_reset_bit_clears_shift_register_and_locks_prg_mode(
+    tmp_path: Path,
+) -> None:
     cartridge = make_rom(tmp_path, 1, 8, 2)
     serial_write(cartridge, 0x8000, 0b00000)  # 32 KB mode
     cartridge.write(0xE000, 1)
